@@ -1,5 +1,5 @@
 // Tiene in memoria l'app (non i tuoi dati) per aprirla più in fretta.
-const CACHE = "myhome-v3";
+const CACHE = "myhome-v4";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "config.js", "vendor/supabase.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",

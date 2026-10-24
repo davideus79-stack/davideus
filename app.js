@@ -18,7 +18,7 @@
     t.textContent = msg;
     t.classList.add("show");
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => t.classList.remove("show"), 2600);
+    toast._t = setTimeout(() => t.classList.remove("show"), msg.length > 60 ? 6000 : 2600);
   }
 
   function fmtSize(b) {
@@ -112,6 +112,7 @@
     $("auth-password").autocomplete = signup ? "new-password" : "current-password";
     $("auth-toggle").innerHTML = signup ? "Hai già un account? <b>Entra</b>" : "Non hai un account? <b>Registrati</b>";
     authMsg("");
+    if (typeof updateFaceIdUi === "function") updateFaceIdUi();
   }
 
   function authMsg(text, kind) {
@@ -156,6 +157,7 @@
         state.justLoggedIn = true;
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        state.lastPassword = password; // serve solo se attivi subito il Face ID dal menu
       }
     } catch (err) {
       authMsg(translateError(err), "error");
@@ -183,6 +185,9 @@
     state.urls.clear();
     $("app").classList.add("hidden");
     $("auth").classList.remove("hidden");
+    $("auth-password").value = "";
+    authMsg("");
+    updateFaceIdUi();
   }
 
   async function showApp() {
@@ -191,8 +196,9 @@
     $("menu-user").textContent = state.user.email;
     const t = state.user.user_metadata && state.user.user_metadata.theme;
     if (t) applyTheme(t);
-    updateLockMenu();
+    updateFaceIdUi();
     if (!state.justLoggedIn) showLock(); // appena entrato con la password non serve chiedere anche il Face ID
+    else if (lock.supported && !fidGet() && state.lastPassword) openSetup(); // propone subito il Face ID
     state.justLoggedIn = false;
     await loadItems();
     subscribe();
@@ -508,63 +514,162 @@
   try { savedTheme = localStorage.getItem("myhome-theme") || "aurora"; } catch (e) {}
   applyTheme(savedTheme);
 
-  // ---------- Sblocco con Face ID ----------
-  // Usa il Face ID del telefono (o l'impronta / Windows Hello sul PC) per aprire l'app.
-  // È un lucchetto su questo dispositivo: la chiave resta nel telefono e non lascia mai il dispositivo.
-  const lock = { supported: false, hiddenAt: 0, open: false };
+  // ---------- Face ID ----------
+  // Con il Face ID (o l'impronta / Windows Hello sul PC) si entra senza scrivere la password
+  // e l'app si blocca quando non la usi. La password viene cifrata con una chiave che solo
+  // il Face ID di questo dispositivo può sbloccare, e non lascia mai il dispositivo.
+  const FID_KEY = "myhome-faceid";
+  const lock = { supported: false, hiddenAt: 0, open: false, pendingCred: null };
   const LOCK_AFTER_MS = 60 * 1000; // si blocca se resti fuori dall'app più di un minuto
-  const lockKey = () => "myhome-lock-" + (state.user ? state.user.id : "");
+  const enc = new TextEncoder(), dec = new TextDecoder();
   const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const unb64 = (str) => Uint8Array.from(atob(str.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
-  function getLockId() { try { return localStorage.getItem(lockKey()); } catch (e) { return null; } }
-  function setLockId(v) { try { v ? localStorage.setItem(lockKey(), v) : localStorage.removeItem(lockKey()); } catch (e) {} }
   const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const bioName = isIOS ? "Face ID" : "impronta o Windows Hello";
+  const bioName = isIOS ? "Face ID" : "impronta / Windows Hello";
+  const bioShort = isIOS ? "Face ID" : "impronta";
+
+  function fidGet() { try { return JSON.parse(localStorage.getItem(FID_KEY) || "null"); } catch (e) { return null; } }
+  function fidSet(v) { try { v ? localStorage.setItem(FID_KEY, JSON.stringify(v)) : localStorage.removeItem(FID_KEY); } catch (e) {} }
+  try { Object.keys(localStorage).filter((k) => k.startsWith("myhome-lock-")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
 
   async function checkLockSupport() {
     try {
-      lock.supported = !!(window.PublicKeyCredential &&
-        (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()));
+      lock.supported = !!(window.PublicKeyCredential && (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()));
     } catch (e) { lock.supported = false; }
-    updateLockMenu();
+    updateFaceIdUi();
   }
 
-  function updateLockMenu() {
+  function updateFaceIdUi() {
+    const f = fidGet();
     const btn = $("lock-toggle");
     btn.classList.toggle("hidden", !lock.supported || !state.user);
-    btn.textContent = getLockId() ? `Disattiva sblocco con ${bioName}` : `Attiva sblocco con ${bioName}`;
-    $("lock-unlock").querySelector("span").textContent = `Sblocca con ${isIOS ? "Face ID" : "impronta"}`;
+    btn.textContent = f ? `Disattiva ${bioName}` : `Attiva ${bioName}`;
+    $("lock-unlock").querySelector("span").textContent = `Sblocca con ${bioShort}`;
+    const loginBtn = $("auth-faceid");
+    const canLogin = lock.supported && f && f.ct && !state.signup;
+    loginBtn.classList.toggle("hidden", !canLogin);
+    $("auth-submit").classList.toggle("primary", !canLogin);
+    $("auth-submit").classList.toggle("soft", !!canLogin);
+    $("auth-submit").textContent = state.signup ? "Crea account" : canLogin ? "Entra con la password" : "Entra";
+    if (canLogin) loginBtn.querySelector("span").textContent = `Entra con ${bioShort}`;
   }
 
-  async function enableLock() {
+  async function createCred() {
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
         rp: { name: "MyHome", id: location.hostname },
-        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: state.user.email, displayName: state.user.email },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: state.user.email, displayName: "MyHome · " + state.user.email },
         pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+        extensions: { prf: {} },
         timeout: 60000,
       },
     });
-    setLockId(b64(cred.rawId));
+    const ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
+    return { id: b64(cred.rawId), prf: !!(ext.prf && ext.prf.enabled) };
   }
 
-  async function verifyLock() {
-    const id = getLockId();
-    await navigator.credentials.get({
-      publicKey: {
-        challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rpId: location.hostname,
-        allowCredentials: [{ type: "public-key", id: unb64(id), transports: ["internal"] }],
-        userVerification: "required",
-        timeout: 60000,
-      },
-    });
+  // Chiede il Face ID; se il dispositivo lo permette restituisce anche una chiave segreta.
+  async function faceIdCheck(credId, salt) {
+    const opts = {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rpId: location.hostname,
+      allowCredentials: [{ type: "public-key", id: unb64(credId), transports: ["internal", "hybrid"] }],
+      userVerification: "required",
+      timeout: 60000,
+    };
+    if (salt) opts.extensions = { prf: { eval: { first: unb64(salt) } } };
+    const res = await navigator.credentials.get({ publicKey: opts });
+    const ext = res.getClientExtensionResults ? res.getClientExtensionResults() : {};
+    const first = ext.prf && ext.prf.results && ext.prf.results.first;
+    if (!first) return null;
+    return crypto.subtle.importKey("raw", new Uint8Array(first).slice(0, 32), "AES-GCM", false, ["encrypt", "decrypt"]);
   }
 
+  // ----- Attivazione (dal menu) -----
+  function openSetup() {
+    lock.pendingCred = null;
+    $("fid-password").value = state.lastPassword || "";
+    $("fid-msg").textContent = "";
+    $("fid-msg").className = "auth-msg";
+    $("fid-go").querySelector("span").textContent = `Attiva ${bioShort}`;
+    $("fid-title").textContent = `Entra con ${bioShort}`;
+    $("fid-dlg").showModal();
+    if (!state.lastPassword) setTimeout(() => $("fid-password").focus(), 50);
+  }
+
+  function setupMsg(t, kind) { const el = $("fid-msg"); el.textContent = t; el.className = "auth-msg" + (kind ? " " + kind : ""); }
+
+  $("fid-cancel").addEventListener("click", () => $("fid-dlg").close());
+  $("fid-go").addEventListener("click", async () => {
+    const pw = $("fid-password").value;
+    if (pw.length < 6) { setupMsg("Scrivi la password con cui sei entrato.", "error"); return; }
+    try {
+      // Primo tocco: l'iPhone crea la chiave Face ID per questa app.
+      if (!lock.pendingCred) {
+        lock.pendingCred = await createCred();
+        lock.pendingCred.salt = b64(crypto.getRandomValues(new Uint8Array(32)));
+        $("fid-go").querySelector("span").textContent = `Conferma con ${bioShort}`;
+        setupMsg(`Ancora un tocco per confermare con ${bioShort}.`, "ok");
+        return;
+      }
+      // Secondo tocco: Face ID, poi cifro la password con la chiave che ne esce.
+      const c = lock.pendingCred;
+      const key = await faceIdCheck(c.id, c.salt);
+      setupMsg("Controllo la password…");
+      const { error } = await sb.auth.signInWithPassword({ email: state.user.email, password: pw });
+      if (error) { setupMsg("La password non è corretta. Riprova.", "error"); return; }
+      const rec = { credId: c.id, salt: c.salt, email: state.user.email };
+      if (key) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        rec.iv = b64(iv);
+        rec.ct = b64(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(pw)));
+      }
+      fidSet(rec);
+      state.lastPassword = null;
+      $("fid-dlg").close();
+      toast(key ? `Fatto! D'ora in poi entri con ${bioShort}` : `Fatto! L'app si apre con ${bioShort}`);
+    } catch (e) {
+      lock.pendingCred = null;
+      $("fid-go").querySelector("span").textContent = `Attiva ${bioShort}`;
+      setupMsg(e && e.name === "NotAllowedError"
+        ? (isIOS ? "Annullato. Se si ripete, controlla che il Portachiavi iCloud sia attivo (Impostazioni › il tuo nome › iCloud › Password)." : "Annullato. Riprova.")
+        : "Non riesco ad attivarlo qui (" + ((e && e.name) || "errore") + ").", "error");
+    }
+    updateFaceIdUi();
+  });
+
+  $("lock-toggle").addEventListener("click", () => {
+    $("menu").classList.add("hidden");
+    if (fidGet()) { fidSet(null); toast(`${bioName} disattivato`); updateFaceIdUi(); }
+    else openSetup();
+  });
+
+  // ----- Accesso con Face ID dalla schermata di login -----
+  $("auth-faceid").addEventListener("click", async () => {
+    const f = fidGet();
+    if (!f) return;
+    try {
+      const key = await faceIdCheck(f.credId, f.salt);
+      if (!key) throw new Error("nokey");
+      authMsg("Accesso in corso…");
+      const pw = dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(f.iv) }, key, unb64(f.ct)));
+      state.justLoggedIn = true;
+      const { error } = await sb.auth.signInWithPassword({ email: f.email, password: pw });
+      if (error) {
+        if (/Invalid login/i.test(error.message)) { fidSet(null); updateFaceIdUi(); authMsg("La password è cambiata: entra con la password e riattiva il Face ID dal menu.", "error"); }
+        else authMsg(translateError(error), "error");
+      }
+    } catch (e) {
+      authMsg(e && e.name === "NotAllowedError" ? "Annullato. Riprova o usa la password." : "Accesso con Face ID non riuscito. Usa la password.", "error");
+    }
+  });
+
+  // ----- Blocco quando riapri l'app -----
   function showLock() {
-    if (!getLockId() || lock.open) return;
+    const f = fidGet();
+    if (!f || !lock.supported || lock.open) return;
     lock.open = true;
     $("lock-msg").textContent = "";
     $("lock").classList.remove("hidden");
@@ -572,35 +677,21 @@
   }
 
   async function tryUnlock(auto) {
+    const f = fidGet();
     try {
-      await verifyLock();
+      await faceIdCheck(f.credId, null);
       lock.open = false;
       $("lock").classList.add("hidden");
     } catch (e) {
-      if (!auto) {
-        const el = $("lock-msg");
-        el.className = "auth-msg error";
-        el.textContent = "Non riconosciuto. Riprova.";
-      }
+      if (!auto) { const el = $("lock-msg"); el.className = "auth-msg error"; el.textContent = "Non riconosciuto. Riprova."; }
     }
   }
 
   $("lock-unlock").addEventListener("click", () => tryUnlock(false));
   $("lock-logout").addEventListener("click", async () => {
-    setLockId(null);
     lock.open = false;
     $("lock").classList.add("hidden");
     await sb.auth.signOut();
-  });
-  $("lock-toggle").addEventListener("click", async () => {
-    $("menu").classList.add("hidden");
-    try {
-      if (getLockId()) { setLockId(null); toast("Sblocco disattivato"); }
-      else { await enableLock(); toast(`Fatto! Da ora l'app si apre con ${bioName}`); }
-    } catch (e) {
-      toast("Attivazione annullata");
-    }
-    updateLockMenu();
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") lock.hiddenAt = Date.now();
