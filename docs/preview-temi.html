@@ -1,0 +1,356 @@
+<title>Temi MyHome</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Outfit:wght@400;600;700&display=swap">
+<style>
+/* Galleria orizzontale di telefoni, uno per tema, con numero e descrizione */
+:root { --pg-bg:#f3f2f8; --pg-fg:#18172a; --pg-muted:#6c6a85; --pg-frame:#16151f; --pg-line:rgba(24,23,42,.1);
+  --pg-display:"Outfit", -apple-system, "Segoe UI", sans-serif; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pg-bg:#0c0b14; --pg-fg:#f2f1fa; --pg-muted:#9b99b5; --pg-frame:#2a2838; --pg-line:rgba(255,255,255,.1); color-scheme:dark; } }
+:root[data-theme="dark"] { --pg-bg:#0c0b14; --pg-fg:#f2f1fa; --pg-muted:#9b99b5; --pg-frame:#2a2838; --pg-line:rgba(255,255,255,.1); color-scheme:dark; }
+body { background:var(--pg-bg); color:var(--pg-fg); font-family:var(--pg-display); margin:0;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 48px; }
+.intro { max-width:720px; margin:0 auto 28px; text-align:center; }
+.intro h1 { font-size:clamp(28px,5vw,42px); margin:0 0 8px; letter-spacing:-.02em; text-wrap:balance; }
+.intro p { color:var(--pg-muted); font-size:17px; margin:0; line-height:1.5; }
+.gallery { display:flex; flex-wrap:wrap; justify-content:center; gap:40px 36px; max-width:1640px; margin:0 auto; }
+.opt { margin:0; display:flex; flex-direction:column; align-items:center; gap:14px; position:relative; min-width:0; }
+.num { position:absolute; top:-10px; left:calc(50% - 160px); z-index:3; width:38px; height:38px; border-radius:50%; background:var(--pg-fg); color:var(--pg-bg); display:grid; place-items:center; font-weight:700; font-size:17px; }
+figcaption { text-align:center; max-width:300px; }
+figcaption h2 { margin:0 0 4px; font-size:22px; }
+figcaption p { margin:0; color:var(--pg-muted); font-size:15px; line-height:1.45; }
+.phone { width:300px; max-width:100%; height:620px; border-radius:46px; padding:10px; background:var(--pg-frame); box-shadow:0 30px 60px rgba(20,18,40,.25); }
+.screen { position:relative; height:100%; border-radius:37px; overflow:hidden; background:var(--bg); color:var(--text);
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing:antialiased; }
+.screen .bg-blobs { position:absolute; }
+.screen .bg-blobs span { filter:blur(50px); }
+.screen .app { padding:38px 14px 20px; }
+.screen .card { animation:none; }
+.screen .list { grid-template-columns:1fr !important; gap:10px; }
+.screen .tabs { margin:16px 0 12px; }
+.screen .ph { color:var(--muted); font-size:16px; padding:6px 6px 26px; }
+.screen .btn { font-size:14px; padding:11px 10px; }
+.screen .note-text { font-size:15px; }
+.screen .card-thumb { aspect-ratio:16/8; }
+.screen .file-badge { width:48px; height:56px; font-size:11px; }
+.screen .meta { font-size:11px; }
+.screen .act { padding:8px 6px; font-size:12px; }
+[data-theme="aurora"] { --bg:#f4f4fb; --text:#17172b; --muted:#6b6b85; --glass:rgba(255,255,255,.72); --glass-border:rgba(255,255,255,.9); --card:#fff; --line:rgba(23,23,43,.08); --primary:#6366f1; --primary-2:#a855f7; --soft:rgba(99,102,241,.1); --soft-text:#4f46e5; --tab-active:#17172b; --tab-active-text:#f4f4fb; --shadow:0 10px 30px rgba(40,40,90,.08); }
+.foot { text-align:center; color:var(--pg-muted); margin-top:36px; font-size:15px; }
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+:root {
+  --bg: #f4f4fb;
+  --text: #17172b;
+  --muted: #6b6b85;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --card: #ffffff;
+  --line: rgba(23, 23, 43, 0.08);
+  --primary: #6366f1;
+  --primary-2: #a855f7;
+  --soft: rgba(99, 102, 241, 0.1);
+  --soft-text: #4f46e5;
+  --danger: #e11d48;
+  --ok: #10b981;
+  --shadow: 0 10px 30px rgba(40, 40, 90, 0.08);
+  --radius: 22px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0e1c;
+    --text: #f1f1fa;
+    --muted: #9a9ab8;
+    --glass: rgba(28, 29, 52, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.07);
+    --card: #191a31;
+    --line: rgba(255, 255, 255, 0.07);
+    --soft: rgba(129, 140, 248, 0.14);
+    --soft-text: #a5b4fc;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Sfondo morbido */
+.bg-blobs { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bg-blobs span { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.45; }
+.bg-blobs span:nth-child(1) { width: 420px; height: 420px; background: var(--blob1, #818cf8); top: -140px; left: -120px; }
+.bg-blobs span:nth-child(2) { width: 380px; height: 380px; background: var(--blob2, #c084fc); top: 30%; right: -160px; }
+.bg-blobs span:nth-child(3) { width: 340px; height: 340px; background: var(--blob3, #67e8f9); bottom: -160px; left: 20%; opacity: 0.25; }
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: var(--shadow);
+}
+
+/* Bottoni */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: 14px; padding: 12px 18px; font: inherit; font-weight: 600; font-size: 15px;
+  cursor: pointer; text-decoration: none; white-space: nowrap; transition: transform 0.12s ease, opacity 0.2s ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: var(--on-primary, #fff); box-shadow: 0 6px 18px var(--primary-glow, rgba(99, 102, 241, 0.35)); }
+.btn.soft { background: var(--soft); color: var(--soft-text); }
+.btn.big { width: 100%; padding: 15px; font-size: 16px; }
+.btn.small { padding: 8px 12px; font-size: 14px; border-radius: 11px; }
+.icon-btn {
+  width: 42px; height: 42px; border-radius: 14px; border: 0; background: var(--soft); color: var(--soft-text);
+  display: grid; place-items: center; cursor: pointer;
+}
+.icon-btn svg { fill: currentColor; stroke: none; }
+.link { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px; cursor: pointer; margin-top: 18px; }
+.link b { color: var(--soft-text); }
+
+/* Accesso */
+.auth { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }
+.auth-card { width: 100%; max-width: 400px; border-radius: 28px; padding: 32px 24px; text-align: center; }
+.auth-logo { width: 76px; height: 76px; border-radius: 20px; box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4); }
+.auth h1, .brand-name { font-family: var(--font-display, inherit); }
+.auth h1 { margin: 16px 0 4px; font-size: 30px; letter-spacing: -0.02em; }
+.auth form { margin-top: 24px; display: grid; gap: 14px; text-align: left; }
+.field span { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 6px 4px; }
+.field input {
+  width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); font: inherit; font-size: 16px; outline: none;
+}
+.field input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--soft); }
+.auth-msg { min-height: 1.2em; margin: 0; font-size: 14px; text-align: center; color: var(--muted); }
+.auth-msg.error { color: var(--danger); }
+.auth-msg.ok { color: var(--ok); }
+
+/* App */
+.app {
+  max-width: 980px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 40px);
+}
+.topbar { display: flex; align-items: center; justify-content: space-between; position: relative; margin-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 42px; height: 42px; border-radius: 12px; }
+.brand-name { font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+.live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+.live.off i { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+.menu { position: absolute; right: 0; top: 52px; z-index: 20; border-radius: 18px; padding: 8px; min-width: 220px; }
+.menu-user { font-size: 13px; color: var(--muted); padding: 8px 12px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; word-break: break-all; }
+.menu-item { display: block; width: 100%; text-align: left; padding: 12px; border: 0; background: none; color: var(--text); font: inherit; font-size: 15px; border-radius: 12px; cursor: pointer; }
+.menu-item:hover { background: var(--soft); }
+.menu-item.danger { color: var(--danger); }
+
+.composer { border-radius: var(--radius); padding: 14px; }
+.composer textarea {
+  width: 100%; border: 0; outline: none; resize: none; background: transparent; color: var(--text);
+  font: inherit; font-size: 17px; line-height: 1.45; padding: 6px 6px 10px; min-height: 70px;
+}
+.composer-actions { display: flex; gap: 10px; justify-content: space-between; }
+.composer-actions .btn { flex: 1; }
+.drop-hint { display: none; text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
+@media (hover: hover) and (pointer: fine) { .drop-hint { display: block; } }
+
+.uploads { display: grid; gap: 8px; margin-top: 12px; }
+.upload-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); font-size: 14px; }
+.upload-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spinner { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--soft); border-top-color: var(--primary); animation: spin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tabs { display: flex; gap: 8px; margin: 22px 0 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex-shrink: 0; border: 0; padding: 9px 16px; border-radius: 999px; background: var(--card); color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow); }
+.tab.active { background: var(--tab-active, var(--text)); color: var(--tab-active-text, var(--bg)); }
+
+.list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 680px) { .list { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 940px) { .list { grid-template-columns: repeat(3, 1fr); } }
+
+.card {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  display: flex; flex-direction: column; animation: pop 0.35s cubic-bezier(.2,.9,.3,1.2);
+}
+.card.fresh { box-shadow: 0 0 0 2px var(--primary), var(--shadow); }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.card-thumb { aspect-ratio: 16 / 10; background: var(--soft); display: grid; place-items: center; cursor: pointer; overflow: hidden; position: relative; }
+.card-thumb img, .card-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card-thumb .play { position: absolute; width: 54px; height: 54px; border-radius: 50%; background: rgba(0,0,0,0.45); display: grid; place-items: center; color: #fff; }
+.card-thumb .play svg { width: 24px; height: 24px; fill: #fff; stroke: none; margin-left: 3px; }
+.file-badge { width: 64px; height: 76px; border-radius: 14px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 14px; letter-spacing: 0.03em; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+.card-body { padding: 14px 16px 6px; flex: 1; }
+.note-text { white-space: pre-wrap; word-break: break-word; font-size: 16px; line-height: 1.5; margin: 0; max-height: 14em; overflow: hidden; }
+.note-text[contenteditable="true"] { outline: 2px solid var(--primary); border-radius: 8px; padding: 6px; max-height: none; }
+.file-name { font-weight: 600; font-size: 15px; word-break: break-word; }
+.meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.card-actions { display: flex; gap: 6px; padding: 8px 10px 12px; }
+.act { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: var(--soft); color: var(--soft-text); border-radius: 12px; padding: 10px 8px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.act svg { width: 16px; height: 16px; }
+.act.del { flex: 0 0 44px; background: rgba(225, 29, 72, 0.1); color: var(--danger); }
+
+.empty { text-align: center; padding: 50px 20px; }
+.empty-art { font-size: 44px; }
+.empty p { margin: 6px 0; }
+
+.dropzone { position: fixed; inset: 0; z-index: 50; background: rgba(99, 102, 241, 0.2); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: grid; place-items: center; }
+.dropzone div { padding: 40px 60px; border: 3px dashed var(--primary); border-radius: 28px; background: var(--card); font-size: 20px; font-weight: 700; color: var(--soft-text); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translate(-50%, 30px);
+  background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: all 0.25s ease; z-index: 60; max-width: calc(100% - 32px);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.viewer { width: min(1000px, 100%); height: min(90vh, 100%); max-width: 100%; max-height: 100%; padding: 0; border: 0; border-radius: 22px; background: var(--card); color: var(--text); }
+.viewer::backdrop { background: rgba(5, 5, 15, 0.7); backdrop-filter: blur(4px); }
+.viewer[open] { display: flex; flex-direction: column; }
+.viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.viewer-bar span { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-bar div { display: flex; gap: 8px; flex-shrink: 0; }
+.viewer-body { flex: 1; display: grid; place-items: center; overflow: auto; background: #000; }
+.viewer-body img, .viewer-body video { max-width: 100%; max-height: 100%; }
+.viewer-body iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+
+/* ================= Temi ================= */
+/* Notte: nero profondo con luci neon */
+[data-theme="notte"] {
+  --bg: #05060a; --text: #f5f7ff; --muted: #8b90a8;
+  --glass: rgba(18, 20, 32, 0.66); --glass-border: rgba(255, 255, 255, 0.08);
+  --card: rgba(20, 22, 36, 0.92); --line: rgba(255, 255, 255, 0.08);
+  --primary: #22d3ee; --primary-2: #e879f9; --primary-glow: rgba(232, 121, 249, 0.35);
+  --soft: rgba(34, 211, 238, 0.12); --soft-text: #67e8f9;
+  --blob1: #0891b2; --blob2: #c026d3; --blob3: #4f46e5;
+  --tab-active: linear-gradient(135deg, #22d3ee, #e879f9); --tab-active-text: #05060a;
+  --shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+/* Carta: elegante, caldo, come un quaderno di lusso */
+[data-theme="carta"] {
+  --bg: #f6f1e7; --text: #1f1b16; --muted: #857a6a;
+  --glass: rgba(255, 252, 245, 0.85); --glass-border: rgba(31, 27, 22, 0.06);
+  --card: #fffdf8; --line: rgba(31, 27, 22, 0.1);
+  --primary: #1f1b16; --primary-2: #3a3128; --primary-glow: rgba(31, 27, 22, 0.18);
+  --soft: rgba(176, 137, 84, 0.13); --soft-text: #8a6232;
+  --blob1: #e9d8b8; --blob2: #f2c9a8; --blob3: #d9e4cf;
+  --tab-active: #1f1b16; --tab-active-text: #f6f1e7;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --shadow: 0 8px 24px rgba(80, 60, 30, 0.08);
+  color-scheme: light;
+}
+/* Tramonto: pesca, corallo e oro, caldo e solare */
+[data-theme="tramonto"] {
+  --bg: #fff4ee; --text: #3b1d1a; --muted: #9a6b62;
+  --glass: rgba(255, 255, 255, 0.7); --glass-border: rgba(255, 255, 255, 0.95);
+  --card: #ffffff; --line: rgba(59, 29, 26, 0.08);
+  --primary: #fb7185; --primary-2: #f59e0b; --primary-glow: rgba(251, 113, 133, 0.4);
+  --soft: rgba(251, 113, 133, 0.12); --soft-text: #e11d48;
+  --blob1: #fda4af; --blob2: #fdba74; --blob3: #fde68a;
+  --tab-active: linear-gradient(135deg, #fb7185, #f59e0b); --tab-active-text: #fff;
+  --shadow: 0 10px 30px rgba(190, 80, 60, 0.1);
+  color-scheme: light;
+}
+/* Oceano: verde acqua e blu, fresco e pulito */
+[data-theme="oceano"] {
+  --bg: #eef8f7; --text: #0b2b33; --muted: #5d7e85;
+  --glass: rgba(255, 255, 255, 0.72); --glass-border: rgba(255, 255, 255, 0.95);
+  --card: #ffffff; --line: rgba(11, 43, 51, 0.08);
+  --primary: #0ea5e9; --primary-2: #14b8a6; --primary-glow: rgba(14, 165, 233, 0.35);
+  --soft: rgba(20, 184, 166, 0.12); --soft-text: #0f766e;
+  --blob1: #5eead4; --blob2: #7dd3fc; --blob3: #a7f3d0;
+  --tab-active: #0b2b33; --tab-active-text: #eef8f7;
+  --shadow: 0 10px 30px rgba(20, 80, 90, 0.09);
+  color-scheme: light;
+}
+
+
+</style>
+<div class="intro"><h1>Scegli il look della tua app</h1><p>Cinque stili per MyHome. Le funzioni sono identiche in tutti: cambia solo l'aspetto. Dimmi il numero che preferisci.</p></div>
+<div class="gallery"><figure class="opt"><div class="num">1</div><div class="phone" data-theme="aurora"><div class="screen">
+<div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="app">
+<header class="topbar"><div class="brand"><img src="icons/icon-192.png" alt=""><div><div class="brand-name">MyHome</div><div class="live"><i></i><span>Sincronizzato</span></div></div></div>
+<span class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span></header>
+<section class="composer glass"><div class="ph">Scrivi una nota…</div>
+<div class="composer-actions"><span class="btn soft"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Carica file</span></span><span class="btn primary">Salva nota</span></div></section>
+<nav class="tabs"><span class="tab active">Tutto</span><span class="tab">Note</span><span class="tab">Foto e video</span><span class="tab">Documenti</span></nav>
+<section class="list">
+<article class="card"><div class="card-body"><p class="note-text">Comprare: latte, pane, caffè.
+Chiamare l'idraulico giovedì alle 10.</p><div class="meta">2 min fa</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Copia</span><span class="act"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>Modifica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><defs><linearGradient id="skyaurora" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs><rect width="320" height="200" fill="url(#skyaurora)"/><circle cx="240" cy="70" r="26" fill="#fff7d6"/><path d="M0 150 L70 95 L130 140 L190 90 L320 160 V200 H0Z" fill="#0f766e"/><path d="M0 170 Q160 140 320 175 V200 H0Z" fill="#115e59"/></svg></div><div class="card-body"><div class="file-name">IMG_2041.jpg</div><div class="meta">2,4 MB · oggi, 16:58</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Apri</span><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><div class="file-badge" style="background:#16a34a">EXCEL</div></div><div class="card-body"><div class="file-name">Spese ottobre.xlsx</div><div class="meta">48 KB · ieri, 21:15</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+</section></div></div></div><figcaption><h2>Aurora</h2><p>Viola e indaco su vetro smerigliato. Di sera diventa scura da sola, seguendo l'iPhone.</p></figcaption></figure><figure class="opt"><div class="num">2</div><div class="phone" data-theme="notte"><div class="screen">
+<div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="app">
+<header class="topbar"><div class="brand"><img src="icons/icon-192.png" alt=""><div><div class="brand-name">MyHome</div><div class="live"><i></i><span>Sincronizzato</span></div></div></div>
+<span class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span></header>
+<section class="composer glass"><div class="ph">Scrivi una nota…</div>
+<div class="composer-actions"><span class="btn soft"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Carica file</span></span><span class="btn primary">Salva nota</span></div></section>
+<nav class="tabs"><span class="tab active">Tutto</span><span class="tab">Note</span><span class="tab">Foto e video</span><span class="tab">Documenti</span></nav>
+<section class="list">
+<article class="card"><div class="card-body"><p class="note-text">Comprare: latte, pane, caffè.
+Chiamare l'idraulico giovedì alle 10.</p><div class="meta">2 min fa</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Copia</span><span class="act"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>Modifica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><defs><linearGradient id="skynotte" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs><rect width="320" height="200" fill="url(#skynotte)"/><circle cx="240" cy="70" r="26" fill="#fff7d6"/><path d="M0 150 L70 95 L130 140 L190 90 L320 160 V200 H0Z" fill="#0f766e"/><path d="M0 170 Q160 140 320 175 V200 H0Z" fill="#115e59"/></svg></div><div class="card-body"><div class="file-name">IMG_2041.jpg</div><div class="meta">2,4 MB · oggi, 16:58</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Apri</span><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><div class="file-badge" style="background:#16a34a">EXCEL</div></div><div class="card-body"><div class="file-name">Spese ottobre.xlsx</div><div class="meta">48 KB · ieri, 21:15</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+</section></div></div></div><figcaption><h2>Notte</h2><p>Nero profondo con luci azzurre e fucsia. Elegante e riposante per gli occhi.</p></figcaption></figure><figure class="opt"><div class="num">3</div><div class="phone" data-theme="carta"><div class="screen">
+<div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="app">
+<header class="topbar"><div class="brand"><img src="icons/icon-192.png" alt=""><div><div class="brand-name">MyHome</div><div class="live"><i></i><span>Sincronizzato</span></div></div></div>
+<span class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span></header>
+<section class="composer glass"><div class="ph">Scrivi una nota…</div>
+<div class="composer-actions"><span class="btn soft"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Carica file</span></span><span class="btn primary">Salva nota</span></div></section>
+<nav class="tabs"><span class="tab active">Tutto</span><span class="tab">Note</span><span class="tab">Foto e video</span><span class="tab">Documenti</span></nav>
+<section class="list">
+<article class="card"><div class="card-body"><p class="note-text">Comprare: latte, pane, caffè.
+Chiamare l'idraulico giovedì alle 10.</p><div class="meta">2 min fa</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Copia</span><span class="act"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>Modifica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><defs><linearGradient id="skycarta" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs><rect width="320" height="200" fill="url(#skycarta)"/><circle cx="240" cy="70" r="26" fill="#fff7d6"/><path d="M0 150 L70 95 L130 140 L190 90 L320 160 V200 H0Z" fill="#0f766e"/><path d="M0 170 Q160 140 320 175 V200 H0Z" fill="#115e59"/></svg></div><div class="card-body"><div class="file-name">IMG_2041.jpg</div><div class="meta">2,4 MB · oggi, 16:58</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Apri</span><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><div class="file-badge" style="background:#16a34a">EXCEL</div></div><div class="card-body"><div class="file-name">Spese ottobre.xlsx</div><div class="meta">48 KB · ieri, 21:15</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+</section></div></div></div><figcaption><h2>Carta</h2><p>Toni caldi da quaderno pregiato, titoli con carattere classico. Sobria e raffinata.</p></figcaption></figure><figure class="opt"><div class="num">4</div><div class="phone" data-theme="tramonto"><div class="screen">
+<div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="app">
+<header class="topbar"><div class="brand"><img src="icons/icon-192.png" alt=""><div><div class="brand-name">MyHome</div><div class="live"><i></i><span>Sincronizzato</span></div></div></div>
+<span class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span></header>
+<section class="composer glass"><div class="ph">Scrivi una nota…</div>
+<div class="composer-actions"><span class="btn soft"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Carica file</span></span><span class="btn primary">Salva nota</span></div></section>
+<nav class="tabs"><span class="tab active">Tutto</span><span class="tab">Note</span><span class="tab">Foto e video</span><span class="tab">Documenti</span></nav>
+<section class="list">
+<article class="card"><div class="card-body"><p class="note-text">Comprare: latte, pane, caffè.
+Chiamare l'idraulico giovedì alle 10.</p><div class="meta">2 min fa</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Copia</span><span class="act"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>Modifica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><defs><linearGradient id="skytramonto" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs><rect width="320" height="200" fill="url(#skytramonto)"/><circle cx="240" cy="70" r="26" fill="#fff7d6"/><path d="M0 150 L70 95 L130 140 L190 90 L320 160 V200 H0Z" fill="#0f766e"/><path d="M0 170 Q160 140 320 175 V200 H0Z" fill="#115e59"/></svg></div><div class="card-body"><div class="file-name">IMG_2041.jpg</div><div class="meta">2,4 MB · oggi, 16:58</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Apri</span><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><div class="file-badge" style="background:#16a34a">EXCEL</div></div><div class="card-body"><div class="file-name">Spese ottobre.xlsx</div><div class="meta">48 KB · ieri, 21:15</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+</section></div></div></div><figcaption><h2>Tramonto</h2><p>Pesca, corallo e oro. Calda, allegra, piena di luce.</p></figcaption></figure><figure class="opt"><div class="num">5</div><div class="phone" data-theme="oceano"><div class="screen">
+<div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="app">
+<header class="topbar"><div class="brand"><img src="icons/icon-192.png" alt=""><div><div class="brand-name">MyHome</div><div class="live"><i></i><span>Sincronizzato</span></div></div></div>
+<span class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span></header>
+<section class="composer glass"><div class="ph">Scrivi una nota…</div>
+<div class="composer-actions"><span class="btn soft"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Carica file</span></span><span class="btn primary">Salva nota</span></div></section>
+<nav class="tabs"><span class="tab active">Tutto</span><span class="tab">Note</span><span class="tab">Foto e video</span><span class="tab">Documenti</span></nav>
+<section class="list">
+<article class="card"><div class="card-body"><p class="note-text">Comprare: latte, pane, caffè.
+Chiamare l'idraulico giovedì alle 10.</p><div class="meta">2 min fa</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Copia</span><span class="act"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>Modifica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><defs><linearGradient id="skyoceano" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs><rect width="320" height="200" fill="url(#skyoceano)"/><circle cx="240" cy="70" r="26" fill="#fff7d6"/><path d="M0 150 L70 95 L130 140 L190 90 L320 160 V200 H0Z" fill="#0f766e"/><path d="M0 170 Q160 140 320 175 V200 H0Z" fill="#115e59"/></svg></div><div class="card-body"><div class="file-name">IMG_2041.jpg</div><div class="meta">2,4 MB · oggi, 16:58</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Apri</span><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+<article class="card"><div class="card-thumb"><div class="file-badge" style="background:#16a34a">EXCEL</div></div><div class="card-body"><div class="file-name">Spese ottobre.xlsx</div><div class="meta">48 KB · ieri, 21:15</div></div>
+<div class="card-actions"><span class="act"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>Scarica</span><span class="act del"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span></div></article>
+</section></div></div></div><figcaption><h2>Oceano</h2><p>Verde acqua e azzurro. Fresca, pulita, rilassante.</p></figcaption></figure></div>
+<p class="foot">Anche dopo potrai cambiare tema quando vuoi dal menu dell'app.</p>

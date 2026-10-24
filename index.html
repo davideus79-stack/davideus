@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MyHome</title>
+  <meta name="description" content="Note e file dal tuo iPhone al tuo PC, all'istante.">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MyHome">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    // Applica subito lo stile scelto, prima che la pagina si disegni.
+    try { var t = localStorage.getItem("myhome-theme"); if (t && t !== "aurora") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <!-- Accesso -->
+  <main id="auth" class="auth hidden">
+    <div class="auth-card glass">
+      <img src="icons/icon-192.png" alt="" class="auth-logo">
+      <h1>MyHome</h1>
+      <p class="muted">Note e file dal telefono al PC, all'istante.</p>
+      <form id="auth-form" autocomplete="on">
+        <label class="field">
+          <span>Email</span>
+          <input id="auth-email" type="email" inputmode="email" autocomplete="email" required placeholder="nome@esempio.it">
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="auth-password" type="password" autocomplete="current-password" required minlength="6" placeholder="Almeno 6 caratteri">
+        </label>
+        <button id="auth-submit" class="btn primary big" type="submit">Entra</button>
+        <p id="auth-msg" class="auth-msg" role="status"></p>
+      </form>
+      <button id="auth-toggle" class="link" type="button">Non hai un account? <b>Registrati</b></button>
+    </div>
+  </main>
+
+  <!-- App -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">
+        <img src="icons/icon-192.png" alt="">
+        <div>
+          <div class="brand-name">MyHome</div>
+          <div class="live"><i></i><span id="live-text">Sincronizzato</span></div>
+        </div>
+      </div>
+      <button id="menu-btn" class="icon-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+      <div id="menu" class="menu glass hidden">
+        <div class="menu-user" id="menu-user"></div>
+        <div class="menu-label">Stile</div>
+        <div class="themes" id="themes">
+          <button class="swatch" data-theme-pick="aurora" title="Aurora" style="--a:#6366f1;--b:#a855f7"><span>Aurora</span></button>
+          <button class="swatch" data-theme-pick="notte" title="Notte" style="--a:#22d3ee;--b:#e879f9;--c:#05060a"><span>Notte</span></button>
+          <button class="swatch" data-theme-pick="carta" title="Carta" style="--a:#1f1b16;--b:#b08954;--c:#f6f1e7"><span>Carta</span></button>
+          <button class="swatch" data-theme-pick="tramonto" title="Tramonto" style="--a:#fb7185;--b:#f59e0b"><span>Tramonto</span></button>
+          <button class="swatch" data-theme-pick="oceano" title="Oceano" style="--a:#0ea5e9;--b:#14b8a6"><span>Oceano</span></button>
+        </div>
+        <button id="delete-all" class="menu-item danger">Cancella tutto</button>
+        <button id="logout" class="menu-item">Esci</button>
+      </div>
+    </header>
+
+    <section class="composer glass">
+      <textarea id="note-input" rows="3" placeholder="Scrivi una nota…"></textarea>
+      <div class="composer-actions">
+        <label class="btn soft" for="file-input">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+          <span>Carica file</span>
+        </label>
+        <input id="file-input" type="file" multiple hidden>
+        <button id="note-save" class="btn primary" disabled>Salva nota</button>
+      </div>
+      <div class="drop-hint">oppure trascina qui i file</div>
+    </section>
+
+    <div id="uploads" class="uploads"></div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-filter="all">Tutto</button>
+      <button class="tab" data-filter="note">Note</button>
+      <button class="tab" data-filter="media">Foto e video</button>
+      <button class="tab" data-filter="doc">Documenti</button>
+    </nav>
+
+    <section id="list" class="list"></section>
+    <div id="empty" class="empty hidden">
+      <div class="empty-art">✨</div>
+      <p><b>Ancora niente qui.</b></p>
+      <p class="muted">Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.</p>
+    </div>
+  </div>
+
+  <div id="dropzone" class="dropzone hidden"><div>Rilascia per caricare</div></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="viewer" class="viewer">
+    <div class="viewer-bar">
+      <span id="viewer-title"></span>
+      <div>
+        <a id="viewer-download" class="btn soft small" href="#">Scarica</a>
+        <button id="viewer-close" class="btn soft small">Chiudi</button>
+      </div>
+    </div>
+    <div id="viewer-body" class="viewer-body"></div>
+  </dialog>
+
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
