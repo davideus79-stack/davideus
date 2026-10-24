@@ -153,6 +153,7 @@
           setTimeout(() => { setAuthMode(false); authMsg("Dopo aver confermato l'email, entra qui.", "ok"); }, 4000);
         }
       } else {
+        state.justLoggedIn = true;
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
@@ -190,6 +191,9 @@
     $("menu-user").textContent = state.user.email;
     const t = state.user.user_metadata && state.user.user_metadata.theme;
     if (t) applyTheme(t);
+    updateLockMenu();
+    if (!state.justLoggedIn) showLock(); // appena entrato con la password non serve chiedere anche il Face ID
+    state.justLoggedIn = false;
     await loadItems();
     subscribe();
   }
@@ -504,7 +508,107 @@
   try { savedTheme = localStorage.getItem("myhome-theme") || "aurora"; } catch (e) {}
   applyTheme(savedTheme);
 
+  // ---------- Sblocco con Face ID ----------
+  // Usa il Face ID del telefono (o l'impronta / Windows Hello sul PC) per aprire l'app.
+  // È un lucchetto su questo dispositivo: la chiave resta nel telefono e non lascia mai il dispositivo.
+  const lock = { supported: false, hiddenAt: 0, open: false };
+  const LOCK_AFTER_MS = 60 * 1000; // si blocca se resti fuori dall'app più di un minuto
+  const lockKey = () => "myhome-lock-" + (state.user ? state.user.id : "");
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unb64 = (str) => Uint8Array.from(atob(str.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  function getLockId() { try { return localStorage.getItem(lockKey()); } catch (e) { return null; } }
+  function setLockId(v) { try { v ? localStorage.setItem(lockKey(), v) : localStorage.removeItem(lockKey()); } catch (e) {} }
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const bioName = isIOS ? "Face ID" : "impronta o Windows Hello";
+
+  async function checkLockSupport() {
+    try {
+      lock.supported = !!(window.PublicKeyCredential &&
+        (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()));
+    } catch (e) { lock.supported = false; }
+    updateLockMenu();
+  }
+
+  function updateLockMenu() {
+    const btn = $("lock-toggle");
+    btn.classList.toggle("hidden", !lock.supported || !state.user);
+    btn.textContent = getLockId() ? `Disattiva sblocco con ${bioName}` : `Attiva sblocco con ${bioName}`;
+    $("lock-unlock").querySelector("span").textContent = `Sblocca con ${isIOS ? "Face ID" : "impronta"}`;
+  }
+
+  async function enableLock() {
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: "MyHome", id: location.hostname },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: state.user.email, displayName: state.user.email },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+        timeout: 60000,
+      },
+    });
+    setLockId(b64(cred.rawId));
+  }
+
+  async function verifyLock() {
+    const id = getLockId();
+    await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rpId: location.hostname,
+        allowCredentials: [{ type: "public-key", id: unb64(id), transports: ["internal"] }],
+        userVerification: "required",
+        timeout: 60000,
+      },
+    });
+  }
+
+  function showLock() {
+    if (!getLockId() || lock.open) return;
+    lock.open = true;
+    $("lock-msg").textContent = "";
+    $("lock").classList.remove("hidden");
+    tryUnlock(true);
+  }
+
+  async function tryUnlock(auto) {
+    try {
+      await verifyLock();
+      lock.open = false;
+      $("lock").classList.add("hidden");
+    } catch (e) {
+      if (!auto) {
+        const el = $("lock-msg");
+        el.className = "auth-msg error";
+        el.textContent = "Non riconosciuto. Riprova.";
+      }
+    }
+  }
+
+  $("lock-unlock").addEventListener("click", () => tryUnlock(false));
+  $("lock-logout").addEventListener("click", async () => {
+    setLockId(null);
+    lock.open = false;
+    $("lock").classList.add("hidden");
+    await sb.auth.signOut();
+  });
+  $("lock-toggle").addEventListener("click", async () => {
+    $("menu").classList.add("hidden");
+    try {
+      if (getLockId()) { setLockId(null); toast("Sblocco disattivato"); }
+      else { await enableLock(); toast(`Fatto! Da ora l'app si apre con ${bioName}`); }
+    } catch (e) {
+      toast("Attivazione annullata");
+    }
+    updateLockMenu();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") lock.hiddenAt = Date.now();
+    else if (state.user && lock.hiddenAt && Date.now() - lock.hiddenAt > LOCK_AFTER_MS) showLock();
+  });
+
   // ---------- Avvio ----------
   setInterval(() => { if (state.user && !state.editing) render(); }, 60 * 1000); // aggiorna "x min fa"
+  checkLockSupport();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

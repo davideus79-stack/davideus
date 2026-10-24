@@ -368,3 +368,12 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 [data-theme="oro"] .file-badge { background: transparent !important; border: 1.5px solid #d4af37; color: #e6c66a; box-shadow: none; }
 [data-theme="oro"] .brand-name { letter-spacing: 0.02em; }
 [data-theme="pop"] .tab.active { background: #111; color: #ffe14d; }
+
+/* Schermata di blocco (Face ID) */
+.lock { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px 16px;
+  background: var(--bg); }
+.lock::before { content: ""; position: absolute; inset: 0; background: linear-gradient(160deg, var(--soft), transparent 60%); }
+.lock-card { position: relative; width: 100%; max-width: 360px; text-align: center; display: grid; gap: 14px; justify-items: center; }
+.lock-card h1 { margin: 4px 0 0; font-size: 30px; font-family: var(--font-display, inherit); }
+.lock-card p { margin: 0; }
+.lock-card .btn svg { width: 24px; height: 24px; }

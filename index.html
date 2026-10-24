@@ -73,6 +73,7 @@
           <button class="swatch" data-theme-pick="pop" title="Pop" style="--a:#ffe14d;--b:#ff5ca8;--c:#111"><span>Pop</span></button>
           <button class="swatch" data-theme-pick="oro" title="Oro" style="--a:#0e0d0b;--b:#d4af37;--c:#1a1814"><span>Oro</span></button>
         </div>
+        <button id="lock-toggle" class="menu-item hidden">Attiva sblocco con Face ID</button>
         <button id="delete-all" class="menu-item danger">Cancella tutto</button>
         <button id="logout" class="menu-item">Esci</button>
       </div>
@@ -105,6 +106,21 @@
       <div class="empty-art">✨</div>
       <p><b>Ancora niente qui.</b></p>
       <p class="muted">Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.</p>
+    </div>
+  </div>
+
+  <!-- Blocco con Face ID -->
+  <div id="lock" class="lock hidden">
+    <div class="lock-card">
+      <img src="icons/icon-192.png?v=2" alt="" class="auth-logo">
+      <h1>MyHome</h1>
+      <p class="muted">L'app è bloccata.</p>
+      <button id="lock-unlock" class="btn primary big">
+        <svg viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9v1.5M15 9v1.5M12 9v4h-1M9.5 16a4 4 0 0 0 5 0"/></svg>
+        <span>Sblocca con Face ID</span>
+      </button>
+      <p id="lock-msg" class="auth-msg" role="status"></p>
+      <button id="lock-logout" class="link" type="button">Non funziona? <b>Entra con la password</b></button>
     </div>
   </div>
 
