@@ -63,6 +63,15 @@
     return { label: (ext || "FILE").slice(0, 5).toUpperCase(), color: "#7c3aed" };
   }
 
+  // Colori dei riquadri per lo stile "Vivace"
+  const TILE = ["#3b7ff5", "#f39a1f", "#34b36a", "#8b5cf6", "#ef4444", "#f97316"];
+  function tileColor(item) {
+    if (item.kind === "file" && category(item) === "doc") return fileStyle(item).color;
+    let h = 0;
+    for (const c of item.id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return TILE[h % TILE.length];
+  }
+
   const ICONS = {
     open: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
     down: '<svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg>',
@@ -338,7 +347,7 @@
     const meta = fmtDate(item.created_at);
     if (item.kind === "note") {
       const editing = state.editing === item.id;
-      return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}">
+      return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}" data-cat="note" style="--tile:${tileColor(item)}">
         <div class="card-body">
           <p class="note-text" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>
           <div class="meta">${meta}</div>
@@ -362,7 +371,7 @@
       thumb = `<div class="file-badge" style="background:${s.color}">${s.label}</div>`;
     }
     const canView = cat === "media" || item.mime_type === "application/pdf";
-    return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}">
+    return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}" data-cat="${cat}" style="--tile:${tileColor(item)}">
       <div class="card-thumb${url && cat === "media" ? "" : " doc"}" data-act="${canView ? "view" : "download"}">${thumb}</div>
       <div class="card-body">
         <div class="file-name">${esc(item.file_name)}</div>
@@ -469,8 +478,8 @@
   });
 
   // ---------- Stile grafico ----------
-  const THEMES = ["aurora", "notte", "carta", "tramonto", "oceano"];
-  const THEME_COLORS = { aurora: "#6366f1", notte: "#05060a", carta: "#f6f1e7", tramonto: "#fb7185", oceano: "#0ea5e9" };
+  const THEMES = ["aurora", "notte", "carta", "tramonto", "oceano", "vivace", "pastello", "pop", "oro"];
+  const THEME_COLORS = { aurora: "#6366f1", notte: "#05060a", carta: "#f6f1e7", tramonto: "#fb7185", oceano: "#0ea5e9", vivace: "#3b7ff5", pastello: "#fbf7f4", pop: "#fff6e0", oro: "#0e0d0b" };
 
   function applyTheme(name) {
     if (!THEMES.includes(name)) name = "aurora";
