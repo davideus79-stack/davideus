@@ -520,7 +520,7 @@
   // il Face ID di questo dispositivo può sbloccare, e non lascia mai il dispositivo.
   const FID_KEY = "myhome-faceid";
   const lock = { supported: false, hiddenAt: 0, open: false, pendingCred: null };
-  const LOCK_AFTER_MS = 60 * 1000; // si blocca se resti fuori dall'app più di un minuto
+  const LOCK_AFTER_MS = 10 * 1000; // si blocca ogni volta che esci dall'app (dopo 10 secondi)
   const enc = new TextEncoder(), dec = new TextDecoder();
   const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const unb64 = (str) => Uint8Array.from(atob(str.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
@@ -669,7 +669,7 @@
   // ----- Blocco quando riapri l'app -----
   function showLock() {
     const f = fidGet();
-    if (!f || !lock.supported || lock.open) return;
+    if (!f || lock.open) return; // se il Face ID è stato attivato, il dispositivo lo supporta
     lock.open = true;
     $("lock-msg").textContent = "";
     $("lock").classList.remove("hidden");
@@ -697,6 +697,8 @@
     if (document.visibilityState === "hidden") lock.hiddenAt = Date.now();
     else if (state.user && lock.hiddenAt && Date.now() - lock.hiddenAt > LOCK_AFTER_MS) showLock();
   });
+  // iPhone: quando l'app torna dalla memoria senza ricaricarsi
+  window.addEventListener("pageshow", (e) => { if (e.persisted && state.user) showLock(); });
 
   // ---------- Avvio ----------
   setInterval(() => { if (state.user && !state.editing) render(); }, 60 * 1000); // aggiorna "x min fa"
