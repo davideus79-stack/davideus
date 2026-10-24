@@ -1,0 +1,50 @@
+<title>Icone MyHome</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap">
+<style>
+/* Griglia di schermate Home finte, una per icona, con numero e nome */
+:root { --bg:#f3f2f8; --fg:#18172a; --muted:#6c6a85; --frame:#16151f; --display:"Outfit", -apple-system, "Segoe UI", sans-serif; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0c0b14; --fg:#f2f1fa; --muted:#9b99b5; --frame:#2a2838; color-scheme:dark; } }
+:root[data-theme="dark"] { --bg:#0c0b14; --fg:#f2f1fa; --muted:#9b99b5; --frame:#2a2838; color-scheme:dark; }
+body { background:var(--bg); color:var(--fg); font-family:var(--display); margin:0;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:32px 48px; }
+.intro { max-width:680px; margin:0 auto 30px; text-align:center; }
+.intro h1 { font-size:clamp(28px,5vw,40px); margin:0 0 8px; letter-spacing:-.02em; text-wrap:balance; }
+.intro p { color:var(--muted); font-size:17px; margin:0; line-height:1.5; }
+.grid { display:flex; flex-wrap:wrap; justify-content:center; gap:36px 30px; max-width:1200px; margin:0 auto; }
+.opt { margin:0; width:290px; max-width:100%; display:grid; gap:14px; justify-items:center; position:relative; }
+.num { position:absolute; top:-12px; left:-6px; z-index:2; width:38px; height:38px; border-radius:50%; background:var(--fg); color:var(--bg); display:grid; place-items:center; font-weight:700; font-size:17px; }
+.home { width:100%; aspect-ratio:1/1.05; border-radius:34px; padding:22px 18px; box-sizing:border-box; border:8px solid var(--frame);
+  background: radial-gradient(120% 90% at 20% 10%, #f9a8d4 0%, transparent 55%), radial-gradient(120% 90% at 90% 90%, #93c5fd 0%, transparent 60%), linear-gradient(160deg,#c4b5fd,#fbcfe8);
+  display:grid; grid-template-columns:repeat(4,1fr); gap:16px 10px; align-content:start; }
+.app { display:grid; justify-items:center; gap:5px; font-family:-apple-system, "SF Pro Text", "Segoe UI", sans-serif; font-size:10.5px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+.app i { width:100%; aspect-ratio:1; border-radius:23%; display:block; background:rgba(255,255,255,.35); }
+.app img { width:100%; aspect-ratio:1; border-radius:23%; display:block; box-shadow:0 4px 10px rgba(0,0,0,.18); }
+.big { grid-column:1 / -1; justify-self:center; display:grid; justify-items:center; gap:8px; margin-top:6px; font-family:-apple-system, "Segoe UI", sans-serif; color:#fff; font-size:13px; font-weight:600; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+.big img { width:118px; height:118px; border-radius:27px; box-shadow:0 12px 26px rgba(30,20,60,.3); }
+figcaption { text-align:center; }
+figcaption h2 { margin:0 0 4px; font-size:21px; }
+figcaption p { margin:0; color:var(--muted); font-size:15px; line-height:1.45; }
+</style>
+<div class="intro"><h1>Scegli l'icona dell'app</h1><p>Sei proposte per MyHome, viste come sulla schermata Home dell'iPhone. Dimmi il numero che ti piace.</p></div>
+<div class="grid" id="grid"></div>
+<script>
+const opts = [
+  ["Casa lampo", "Una casa con un lampo: le tue cose arrivano subito, ovunque."],
+  ["Telefono e PC", "iPhone e computer uniti da un lampo. Dice esattamente cosa fa l'app."],
+  ["La M", "Una grande M bianca su corallo e rosa. Semplice e riconoscibile."],
+  ["Cartella magica", "Una cartella dorata con una stella. Il posto dove metti tutto."],
+  ["Aeroplanino", "Un aeroplanino di carta: scrivi, invii, arriva."],
+  ["Quattro riquadri", "Nota, video, foto e invio in quattro colori, nello stile Vivace."],
+];
+const grid = document.getElementById("grid");
+opts.forEach(([name, desc], i) => {
+  const n = i + 1;
+  const filler = Array.from({ length: 4 }, (_, k) => `<div class="app"><i></i><span>&nbsp;</span></div>`).join("");
+  grid.insertAdjacentHTML("beforeend", `<figure class="opt"><div class="num">${n}</div>
+    <div class="home">${filler}<div class="app"><img src="icon-options/opt${n}-512.png" alt=""><span>MyHome</span></div>
+      <div class="app"><i></i><span>&nbsp;</span></div><div class="app"><i></i><span>&nbsp;</span></div><div class="app"><i></i><span>&nbsp;</span></div>
+      <div class="big"><img src="icon-options/opt${n}-512.png" alt="Icona ${name}"></div></div>
+    <figcaption><h2>${name}</h2><p>${desc}</p></figcaption></figure>`);
+});
+</script>
