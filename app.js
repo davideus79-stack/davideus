@@ -7,8 +7,16 @@
   });
   const BUCKET = "files";
 
+  // Da quale dispositivo arriva ogni nota o file (si vede sulle schede).
+  const UA = navigator.userAgent;
+  const DEVICE = /iPhone/.test(UA) ? "iPhone" : /iPad/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iPad" : /Android/.test(UA) ? "telefono" : "PC";
+  const IS_MOBILE = DEVICE !== "PC";
+  // Sul telefono: il tasto "Salva" apre il menu dell'iPhone (Salva immagine, Salva su File, Apri in Word…)
+  let CAN_SHARE_FILES = false;
+  try { CAN_SHARE_FILES = IS_MOBILE && !!navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.txt", { type: "text/plain" })] }); } catch (e) {}
+
   const $ = (id) => document.getElementById(id);
-  const state = { user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
+  const state = { blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
 
   // ---------- Utilità ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -79,6 +87,7 @@
     edit: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>',
     save: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>',
     del: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+    share: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0-12L8 7m4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></svg>',
   };
 
@@ -221,6 +230,10 @@
         if (p.eventType === "INSERT") {
           if (p.new.user_id !== state.user.id || state.items.some((i) => i.id === p.new.id)) return;
           state.items.unshift(p.new);
+          if (p.new.source && p.new.source !== DEVICE) {
+            toast(`Arrivato ${fromLabel(p.new.source)}: ${p.new.kind === "note" ? "una nota" : p.new.file_name}`);
+            if (navigator.vibrate) navigator.vibrate(30);
+          }
           await prefetchThumbs([p.new]);
           render(p.new.id);
         } else if (p.eventType === "UPDATE") {
@@ -263,7 +276,7 @@
     const text = noteInput.value.trim();
     if (!text) return;
     $("note-save").disabled = true;
-    const { data, error } = await sb.from("items").insert({ kind: "note", content: text }).select().single();
+    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE }).select().single();
     if (error) { toast(translateError(error)); $("note-save").disabled = false; return; }
     noteInput.value = "";
     noteInput.style.height = "auto";
@@ -301,7 +314,7 @@
       if (upErr) throw upErr;
       const { data, error } = await sb
         .from("items")
-        .insert({ kind: "file", file_path: path, file_name: file.name, mime_type: file.type || null, size_bytes: file.size })
+        .insert({ kind: "file", file_path: path, file_name: file.name, mime_type: file.type || null, size_bytes: file.size, source: DEVICE })
         .select()
         .single();
       if (error) { await sb.storage.from(BUCKET).remove([path]); throw error; }
@@ -353,8 +366,10 @@
     list.innerHTML = items.map((i) => cardHtml(i, i.id === freshId)).join("");
   }
 
+  function fromLabel(src) { return src === "PC" ? "dal PC" : src === "iPhone" ? "dall'iPhone" : src === "iPad" ? "dall'iPad" : "dal " + src; }
+
   function cardHtml(item, fresh) {
-    const meta = fmtDate(item.created_at);
+    const meta = fmtDate(item.created_at) + (item.source ? ` · <span class="src">${esc(fromLabel(item.source))}</span>` : "");
     if (item.kind === "note") {
       const editing = state.editing === item.id;
       return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}" data-cat="note" style="--tile:${tileColor(item)}">
@@ -389,7 +404,9 @@
       </div>
       <div class="card-actions">
         ${canView ? `<button class="act" data-act="view">${ICONS.open}Apri</button>` : ""}
-        <button class="act" data-act="download">${ICONS.down}Scarica</button>
+        ${CAN_SHARE_FILES
+          ? `<button class="act" data-act="share">${ICONS.share}${state.blobs.has(item.id) ? "Tocca per salvare" : "Salva"}</button>`
+          : `<button class="act" data-act="download">${ICONS.down}Scarica</button>`}
         <button class="act del" data-act="delete" aria-label="Cancella">${ICONS.del}</button>
       </div>
     </article>`;
@@ -426,6 +443,8 @@
         render();
       } else if (act === "view") {
         openViewer(item);
+      } else if (act === "share") {
+        await shareFile(item, btn);
       } else if (act === "download") {
         const url = await signedUrl(item.file_path, item.file_name);
         const a = document.createElement("a");
@@ -441,6 +460,34 @@
       toast(translateError(err));
     }
   });
+
+  // Prepara il file e apre il menu Condividi dell'iPhone, da cui si salva in Foto o in File.
+  async function shareFile(item, btn) {
+    let file = state.blobs.get(item.id);
+    if (!file) {
+      btn.innerHTML = '<span class="spinner"></span>Preparo…';
+      const res = await fetch(await signedUrl(item.file_path));
+      if (!res.ok) throw new Error("download");
+      const blob = await res.blob();
+      file = new File([blob], item.file_name, { type: item.mime_type || blob.type || "application/octet-stream" });
+      state.blobs.set(item.id, file);
+    }
+    try {
+      await navigator.share({ files: [file] });
+      btn.innerHTML = ICONS.share + "Salva";
+    } catch (e) {
+      if (e && e.name === "NotAllowedError") {
+        // L'iPhone vuole un secondo tocco dopo aver scaricato il file.
+        btn.innerHTML = ICONS.share + "Tocca per salvare";
+        toast("Pronto! Tocca di nuovo per salvarlo sull'iPhone");
+      } else if (!e || e.name !== "AbortError") {
+        btn.innerHTML = ICONS.share + "Salva";
+        throw e;
+      } else {
+        btn.innerHTML = ICONS.share + "Salva";
+      }
+    }
+  }
 
   async function deleteItems(items) {
     const paths = items.filter((i) => i.file_path).map((i) => i.file_path);

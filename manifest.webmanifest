@@ -1,7 +1,7 @@
 {
   "name": "MyHome",
   "short_name": "MyHome",
-  "description": "Note e file dal tuo iPhone al tuo PC, all'istante.",
+  "description": "Note e file tra il tuo iPhone e il tuo PC, all'istante.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
