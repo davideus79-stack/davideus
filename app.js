@@ -16,7 +16,7 @@
   try { CAN_SHARE_FILES = IS_MOBILE && !!navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.txt", { type: "text/plain" })] }); } catch (e) {}
 
   const $ = (id) => document.getElementById(id);
-  const state = { blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
+  const state = { folders: [], folder: null, blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
 
   // ---------- Utilità ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -88,6 +88,9 @@
     save: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>',
     del: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0-12L8 7m4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+    folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>',
+    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></svg>',
   };
 
@@ -191,6 +194,8 @@
   function showAuth() {
     if (state.channel) { sb.removeChannel(state.channel); state.channel = null; }
     state.items = [];
+    state.folders = [];
+    state.folder = null;
     state.urls.clear();
     $("app").classList.add("hidden");
     $("auth").classList.remove("hidden");
@@ -218,6 +223,9 @@
     const { data, error } = await sb.from("items").select("*").order("created_at", { ascending: false }).limit(1000);
     if (error) { toast(translateError(error)); return; }
     state.items = data || [];
+    const fr = await sb.from("folders").select("*").order("name");
+    if (!fr.error) state.folders = fr.data || [];
+    if (state.folder && !state.folders.some((f) => f.id === state.folder)) state.folder = null;
     await prefetchThumbs(state.items);
     render();
   }
@@ -245,6 +253,20 @@
           state.items = state.items.filter((i) => i.id !== p.old.id);
           if (state.items.length !== before) render();
         }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "folders" }, (p) => {
+        if (p.eventType === "INSERT") {
+          if (p.new.user_id !== state.user.id || state.folders.some((f) => f.id === p.new.id)) return;
+          state.folders.push(p.new);
+        } else if (p.eventType === "UPDATE") {
+          state.folders = state.folders.map((f) => (f.id === p.new.id ? p.new : f));
+        } else if (p.eventType === "DELETE") {
+          state.folders = state.folders.filter((f) => f.id !== p.old.id);
+          state.items = state.items.map((i) => (i.folder_id === p.old.id ? { ...i, folder_id: null } : i));
+          if (state.folder === p.old.id) state.folder = null;
+        }
+        sortFolders();
+        render();
       })
       .subscribe((status) => {
         const live = document.querySelector(".live");
@@ -276,7 +298,7 @@
     const text = noteInput.value.trim();
     if (!text) return;
     $("note-save").disabled = true;
-    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE }).select().single();
+    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder }).select().single();
     if (error) { toast(translateError(error)); $("note-save").disabled = false; return; }
     noteInput.value = "";
     noteInput.style.height = "auto";
@@ -314,7 +336,7 @@
       if (upErr) throw upErr;
       const { data, error } = await sb
         .from("items")
-        .insert({ kind: "file", file_path: path, file_name: file.name, mime_type: file.type || null, size_bytes: file.size, source: DEVICE })
+        .insert({ kind: "file", file_path: path, file_name: file.name, mime_type: file.type || null, size_bytes: file.size, source: DEVICE, folder_id: state.folder })
         .select()
         .single();
       if (error) { await sb.storage.from(BUCKET).remove([path]); throw error; }
@@ -360,16 +382,21 @@
   );
 
   function render(freshId) {
+    renderFolders();
     const list = $("list");
-    const items = state.items.filter((i) => state.filter === "all" || category(i) === state.filter);
+    const items = state.items.filter((i) =>
+      (state.filter === "all" || category(i) === state.filter) && (!state.folder || i.folder_id === state.folder));
     $("empty").classList.toggle("hidden", items.length > 0);
+    $("empty-folder").classList.toggle("hidden", !state.folder);
     list.innerHTML = items.map((i) => cardHtml(i, i.id === freshId)).join("");
   }
 
   function fromLabel(src) { return src === "PC" ? "dal PC" : src === "iPhone" ? "dall'iPhone" : src === "iPad" ? "dall'iPad" : "dal " + src; }
 
   function cardHtml(item, fresh) {
-    const meta = fmtDate(item.created_at) + (item.source ? ` · <span class="src">${esc(fromLabel(item.source))}</span>` : "");
+    const fold = !state.folder && item.folder_id && state.folders.find((f) => f.id === item.folder_id);
+    const meta = fmtDate(item.created_at) + (item.source ? ` · <span class="src">${esc(fromLabel(item.source))}</span>` : "")
+      + (fold ? ` · <span class="in-folder" style="--fc:${fold.color || "#6366f1"}">${ICONS.folder}${esc(fold.name)}</span>` : "");
     if (item.kind === "note") {
       const editing = state.editing === item.id;
       return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}" data-cat="note" style="--tile:${tileColor(item)}">
@@ -380,6 +407,7 @@
         <div class="card-actions">
           <button class="act" data-act="copy">${ICONS.copy}Copia</button>
           <button class="act" data-act="${editing ? "save" : "edit"}">${editing ? ICONS.save + "Fatto" : ICONS.edit + "Modifica"}</button>
+          <button class="act icon" data-act="move" aria-label="Sposta in una cartella" title="Sposta in una cartella">${ICONS.folder}</button>
           <button class="act del" data-act="delete" aria-label="Cancella">${ICONS.del}</button>
         </div>
       </article>`;
@@ -407,6 +435,7 @@
         ${CAN_SHARE_FILES
           ? `<button class="act" data-act="share">${ICONS.share}${state.blobs.has(item.id) ? "Tocca per salvare" : "Salva"}</button>`
           : `<button class="act" data-act="download">${ICONS.down}Scarica</button>`}
+        <button class="act icon" data-act="move" aria-label="Sposta in una cartella" title="Sposta in una cartella">${ICONS.folder}</button>
         <button class="act del" data-act="delete" aria-label="Cancella">${ICONS.del}</button>
       </div>
     </article>`;
@@ -443,6 +472,8 @@
         render();
       } else if (act === "view") {
         openViewer(item);
+      } else if (act === "move") {
+        openMove(item);
       } else if (act === "share") {
         await shareFile(item, btn);
       } else if (act === "download") {
@@ -460,6 +491,119 @@
       toast(translateError(err));
     }
   });
+
+  // ---------- Cartelle ----------
+  const FOLDER_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#ef4444", "#ec4899", "#14b8a6", "#64748b"];
+  const sortFolders = () => state.folders.sort((a, b) => a.name.localeCompare(b.name, "it", { sensitivity: "base" }));
+
+  function renderFolders() {
+    const cur = state.folders.find((f) => f.id === state.folder);
+    $("note-input").placeholder = cur ? `Scrivi una nota in "${cur.name}"…` : "Scrivi una nota…";
+    $("folder-bar").classList.toggle("hidden", !!cur);
+    $("folder-head").classList.toggle("hidden", !cur);
+    if (cur) {
+      $("folder-title").textContent = cur.name;
+      $("folder-head").style.setProperty("--fc", cur.color || "#6366f1");
+      $("folder-count").textContent = countLabel(state.items.filter((i) => i.folder_id === cur.id).length);
+      return;
+    }
+    $("folder-bar").innerHTML = state.folders.map((f) => {
+      const n = state.items.filter((i) => i.folder_id === f.id).length;
+      return `<button class="folder-chip" data-folder="${f.id}" style="--fc:${f.color || "#6366f1"}">
+        <span class="fico">${ICONS.folder}</span><span class="fname">${esc(f.name)}</span><span class="fnum">${n}</span></button>`;
+    }).join("") + `<button class="folder-chip add" data-folder-new="1"><span class="fico">${ICONS.plus}</span><span class="fname">Nuova cartella</span></button>`;
+  }
+  const countLabel = (n) => (n === 1 ? "1 elemento" : n + " elementi");
+
+  $("folder-bar").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.folderNew) return openFolderName(null);
+    state.folder = b.dataset.folder;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  $("folder-back").addEventListener("click", () => { state.folder = null; render(); });
+  $("folder-rename").addEventListener("click", () => openFolderName(state.folders.find((f) => f.id === state.folder)));
+  $("folder-delete").addEventListener("click", async () => {
+    const f = state.folders.find((x) => x.id === state.folder);
+    if (!f) return;
+    if (!confirm(`Vuoi eliminare la cartella "${f.name}"? Il suo contenuto non viene cancellato: torna in "Tutte".`)) return;
+    const { error } = await sb.from("folders").delete().eq("id", f.id);
+    if (error) return toast(translateError(error));
+    state.folders = state.folders.filter((x) => x.id !== f.id);
+    state.items = state.items.map((i) => (i.folder_id === f.id ? { ...i, folder_id: null } : i));
+    state.folder = null;
+    render();
+    toast("Cartella eliminata");
+  });
+
+  // Finestra per creare o rinominare una cartella
+  let editingFolder = null;
+  function openFolderName(folder) {
+    editingFolder = folder;
+    $("fn-title").textContent = folder ? "Rinomina cartella" : "Nuova cartella";
+    $("fn-save").textContent = folder ? "Salva" : "Crea";
+    $("fn-input").value = folder ? folder.name : "";
+    const color = (folder && folder.color) || FOLDER_COLORS[state.folders.length % FOLDER_COLORS.length];
+    $("fn-colors").innerHTML = FOLDER_COLORS.map((c) =>
+      `<button type="button" class="fn-color${c === color ? " on" : ""}" data-color="${c}" style="--fc:${c}" aria-label="Colore"></button>`).join("");
+    $("fn-dlg").showModal();
+    setTimeout(() => $("fn-input").focus(), 50);
+  }
+  $("fn-colors").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-color]");
+    if (!b) return;
+    $("fn-colors").querySelectorAll(".fn-color").forEach((x) => x.classList.toggle("on", x === b));
+  });
+  $("fn-cancel").addEventListener("click", () => $("fn-dlg").close());
+  $("fn-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("fn-input").value.trim().slice(0, 60);
+    if (!name) return;
+    const color = ($("fn-colors").querySelector(".on") || {}).dataset?.color || FOLDER_COLORS[0];
+    if (editingFolder) {
+      const { data, error } = await sb.from("folders").update({ name, color }).eq("id", editingFolder.id).select().single();
+      if (error) return toast(translateError(error));
+      state.folders = state.folders.map((f) => (f.id === data.id ? data : f));
+    } else {
+      const { data, error } = await sb.from("folders").insert({ name, color }).select().single();
+      if (error) return toast(translateError(error));
+      if (!state.folders.some((f) => f.id === data.id)) state.folders.push(data);
+      state.folder = data.id; // entra subito nella cartella nuova
+      if (state.moving) { await moveTo(state.moving, data.id); state.moving = null; }
+    }
+    sortFolders();
+    $("fn-dlg").close();
+    render();
+  });
+
+  // Finestra "Sposta in…"
+  function openMove(item) {
+    state.moving = item;
+    const opts = [{ id: "", name: "Nessuna cartella", color: "#94a3b8" }, ...state.folders];
+    $("mv-list").innerHTML = opts.map((f) => `<button type="button" class="mv-opt${(item.folder_id || "") === f.id ? " on" : ""}" data-to="${f.id}" style="--fc:${f.color || "#6366f1"}">
+      <span class="fico">${ICONS.folder}</span><span>${esc(f.name)}</span></button>`).join("")
+      + `<button type="button" class="mv-opt add" data-to-new="1"><span class="fico">${ICONS.plus}</span><span>Nuova cartella…</span></button>`;
+    $("mv-dlg").showModal();
+  }
+  $("mv-cancel").addEventListener("click", () => { state.moving = null; $("mv-dlg").close(); });
+  $("mv-list").addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    $("mv-dlg").close();
+    if (b.dataset.toNew) return openFolderName(null); // dopo la creazione l'elemento viene spostato lì
+    await moveTo(state.moving, b.dataset.to || null);
+    state.moving = null;
+  });
+  async function moveTo(item, folderId) {
+    const { data, error } = await sb.from("items").update({ folder_id: folderId }).eq("id", item.id).select().single();
+    if (error) return toast(translateError(error));
+    state.items = state.items.map((i) => (i.id === item.id ? data : i));
+    render();
+    const f = state.folders.find((x) => x.id === folderId);
+    toast(f ? `Spostato in "${f.name}"` : "Tolto dalla cartella");
+  }
 
   // Prepara il file e apre il menu Condividi dell'iPhone, da cui si salva in Foto o in File.
   async function shareFile(item, btn) {

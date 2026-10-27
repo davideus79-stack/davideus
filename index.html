@@ -98,6 +98,14 @@
 
     <div id="uploads" class="uploads"></div>
 
+    <div id="folder-bar" class="folder-bar"></div>
+    <div id="folder-head" class="folder-head hidden">
+      <button id="folder-back" class="icon-btn" aria-label="Torna a tutte"><svg viewBox="0 0 24 24" style="fill:none;stroke:currentColor"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="fh-text"><div id="folder-title" class="fh-title"></div><div id="folder-count" class="fh-sub"></div></div>
+      <button id="folder-rename" class="btn soft small">Rinomina</button>
+      <button id="folder-delete" class="btn soft small danger-soft">Elimina</button>
+    </div>
+
     <nav class="tabs" role="tablist">
       <button class="tab active" data-filter="all">Tutto</button>
       <button class="tab" data-filter="note">Note</button>
@@ -110,6 +118,7 @@
       <div class="empty-art">✨</div>
       <p><b>Ancora niente qui.</b></p>
       <p class="muted">Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.</p>
+      <p id="empty-folder" class="muted hidden">Quello che crei mentre sei in questa cartella finisce qui dentro. Puoi anche spostarci le cose con il tasto cartella su ogni scheda.</p>
     </div>
   </div>
 
@@ -127,6 +136,29 @@
       <button id="lock-logout" class="link" type="button">Non funziona? <b>Entra con la password</b></button>
     </div>
   </div>
+
+  <!-- Nuova cartella / rinomina -->
+  <dialog id="fn-dlg" class="fid-dlg">
+    <form id="fn-form" class="fid-card" method="dialog">
+      <h2 id="fn-title">Nuova cartella</h2>
+      <label class="field">
+        <span>Nome</span>
+        <input id="fn-input" type="text" maxlength="60" placeholder="Es. Casa, Lavoro, Viaggi" autocomplete="off" required>
+      </label>
+      <div id="fn-colors" class="fn-colors"></div>
+      <button id="fn-save" class="btn primary big" type="submit">Crea</button>
+      <button id="fn-cancel" class="link" type="button">Annulla</button>
+    </form>
+  </dialog>
+
+  <!-- Sposta in una cartella -->
+  <dialog id="mv-dlg" class="fid-dlg">
+    <div class="fid-card">
+      <h2>Sposta in…</h2>
+      <div id="mv-list" class="mv-list"></div>
+      <button id="mv-cancel" class="link" type="button">Annulla</button>
+    </div>
+  </dialog>
 
   <!-- Attivazione Face ID -->
   <dialog id="fid-dlg" class="fid-dlg">

@@ -391,3 +391,37 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .fid-card .link { margin-top: 0; }
 .meta .src { font-weight: 600; }
 .act .spinner { width: 14px; height: 14px; border-width: 2px; }
+
+/* Cartelle */
+.folder-bar { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 20px -16px 0; padding: 4px 16px 6px; }
+.folder-bar::-webkit-scrollbar { display: none; }
+.folder-chip { flex-shrink: 0; display: flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font: inherit;
+  padding: 10px 14px 10px 10px; border-radius: 16px; background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.folder-chip .fico { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--fc) 16%, transparent); color: var(--fc); }
+.folder-chip .fico svg { width: 19px; height: 19px; fill: color-mix(in srgb, var(--fc) 30%, transparent); }
+.folder-chip .fname { font-weight: 600; font-size: 14px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-chip .fnum { font-size: 12px; font-weight: 700; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 8px; }
+.folder-chip.add { --fc: var(--primary); background: transparent; box-shadow: none; border: 2px dashed var(--line); color: var(--muted); }
+.folder-chip.add .fico svg { fill: none; }
+.folder-head { display: flex; align-items: center; gap: 10px; margin-top: 20px; padding: 12px; border-radius: 20px;
+  background: color-mix(in srgb, var(--fc) 14%, var(--card)); box-shadow: var(--shadow); }
+.folder-head .icon-btn svg { stroke-width: 2.4; }
+.fh-text { flex: 1; min-width: 0; }
+.fh-title { font-weight: 700; font-size: 19px; font-family: var(--font-display, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.fh-sub { font-size: 12px; color: var(--muted); }
+.btn.danger-soft { background: rgba(225, 29, 72, 0.1); color: var(--danger); }
+@media (max-width: 420px) { .folder-head .btn.small { padding: 8px 9px; font-size: 13px; } }
+.act.icon { flex: 0 0 44px; }
+.meta .in-folder { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: var(--fc); }
+.meta .in-folder svg { width: 12px; height: 12px; }
+[data-theme="vivace"] .card[data-cat="note"] .in-folder, [data-theme="vivace"] .card[data-cat="doc"] .in-folder { color: #fff; }
+.fn-colors { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.fn-color { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--fc); cursor: pointer; box-shadow: 0 0 0 2px var(--card), 0 0 0 3px transparent; }
+.fn-color.on { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--fc); }
+.mv-list { width: 100%; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+.mv-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; }
+.mv-opt .fico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--fc) 16%, transparent); color: var(--fc); }
+.mv-opt.on { border-color: var(--primary); box-shadow: 0 0 0 2px var(--soft); }
+.mv-opt.add { --fc: var(--primary); border-style: dashed; color: var(--muted); }
