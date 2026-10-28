@@ -443,9 +443,10 @@
       return;
     }
 
-    const scope = state.items.filter((i) => (!inFolder || i.folder_id === state.folder) && matchesQ(i));
+    // Quello che sta in una cartella si vede solo lì (la ricerca però trova tutto)
+    const scope = state.items.filter((i) => (inFolder ? i.folder_id === state.folder : state.q || loose(i)) && matchesQ(i));
     // numeri accanto a Tutto / Note / Foto / Documenti
-    const all = state.items;
+    const all = state.items.filter(loose);
     const counts = { all: all.length, note: 0, media: 0, doc: 0 };
     all.forEach((i) => counts[category(i)]++);
     document.querySelectorAll("[data-count]").forEach((el) => (el.textContent = counts[el.dataset.count] || ""));
@@ -469,6 +470,8 @@
       : `Tocca ${ADD_WORD} per aggiungerne: compariranno subito su tutti i tuoi dispositivi.`;
     list.innerHTML = items.map((i) => (view === "list" ? rowHtml(i, i.id === freshId) : cardHtml(i, i.id === freshId))).join("");
   }
+  // true se l'elemento non è dentro nessuna cartella
+  const loose = (i) => !i.folder_id || !state.folders.some((f) => f.id === i.folder_id);
   const EMPTY_TITLES = { all: "Ancora niente qui.", note: "Nessuna nota.", media: "Nessuna foto o video.", doc: "Nessun documento." };
   const ADD_WORD = IS_MOBILE ? "+" : "Aggiungi";
 
@@ -481,7 +484,8 @@
   function renderHome(freshId) {
     $("hello-title").textContent = greeting();
     const by = { note: [], media: [], doc: [] };
-    state.items.forEach((i) => by[category(i)].push(i));
+    const free = state.items.filter(loose);
+    free.forEach((i) => by[category(i)].push(i));
     const setCount = (k, n, one, many) => {
       document.querySelector(`[data-tile-count="${k}"]`).textContent = n;
       document.querySelector(`[data-tile-unit="${k}"]`).textContent = plural(n, one, many);
@@ -493,7 +497,7 @@
 
     // Nei riquadri niente anteprime: solo icona, nome e numero (Davide preferisce così)
 
-    const recent = state.items.slice(0, IS_MOBILE ? 5 : 8);
+    const recent = free.slice(0, IS_MOBILE ? 5 : 8);
     $("recent").innerHTML = recent.map((i) => rowHtml(i, i.id === freshId)).join("");
     $("recent").classList.toggle("hidden", !recent.length);
     $("recent-empty").classList.toggle("hidden", recent.length > 0);
