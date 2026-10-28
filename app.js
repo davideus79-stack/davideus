@@ -334,7 +334,7 @@
     const rv = $("note-remind").value;
     const remind_at = rv ? new Date(rv).toISOString() : null;
     if (remind_at) ensurePush(permAsk);
-    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder, remind_at }).select().single();
+    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder, remind_at, event_date: state.noteDay ? (remind_at ? dkey(new Date(remind_at)) : state.noteDay) : null }).select().single();
     if (error) { toast(translateError(error)); $("note-save").disabled = false; return; }
     noteInput.value = "";
     $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden");
@@ -453,11 +453,23 @@
     renderFolders();
     const home = state.screen === "home" && !state.q;
     const folders = state.screen === "folders";
+    const calendar = state.screen === "calendar";
     const inFolder = !!state.folder;
     const app = $("app");
-    app.dataset.screen = home ? "home" : folders ? "folders" : "list";
+    app.dataset.screen = home ? "home" : folders ? "folders" : calendar ? "calendar" : "list";
     document.querySelectorAll(".side-nav [data-go]").forEach((b) =>
-      b.classList.toggle("active", b.dataset.go === "home" ? state.screen === "home" : state.screen === "list" && !inFolder && b.dataset.filter === state.filter));
+      b.classList.toggle("active", b.dataset.go === "home" ? state.screen === "home" : b.dataset.go === "calendar" ? calendar : state.screen === "list" && !inFolder && b.dataset.filter === state.filter));
+    $("cal").classList.toggle("hidden", !calendar);
+    if (calendar) {
+      $("home-hello").classList.add("hidden"); $("home-body").classList.add("hidden"); $("folder-grid").classList.add("hidden");
+      $("search").closest(".search").classList.add("hidden"); $("folder-back").classList.remove("hidden");
+      $("list").innerHTML = ""; $("list").className = "list hidden"; $("empty").classList.add("hidden"); $("view-toggle").classList.add("hidden");
+      $("recent").innerHTML = ""; $("favs").innerHTML = "";
+      $("main-title").textContent = "Calendario"; $("main-sub").textContent = "Note e promemoria, giorno per giorno";
+      renderCal(freshId);
+      return;
+    }
+    $("cal-list").innerHTML = "";
     document.querySelector(".side-label").classList.toggle("on", folders);
     $("home-hello").classList.toggle("hidden", state.screen !== "home");
     $("home-body").classList.toggle("hidden", !home);
@@ -505,7 +517,8 @@
     list.innerHTML = items.map((i) => (view === "list" ? rowHtml(i, i.id === freshId) : cardHtml(i, i.id === freshId))).join("");
   }
   // true se l'elemento non è dentro nessuna cartella
-  const loose = (i) => !i.folder_id || !state.folders.some((f) => f.id === i.folder_id);
+  // (le note messe su un giorno del calendario stanno solo nel calendario)
+  const loose = (i) => !i.event_date && (!i.folder_id || !state.folders.some((f) => f.id === i.folder_id));
   const EMPTY_TITLES = { all: "Ancora niente qui.", note: "Nessuna nota.", media: "Nessuna foto o video.", doc: "Nessun documento." };
   const ADD_WORD = IS_MOBILE ? "+" : "Aggiungi";
 
@@ -528,6 +541,7 @@
     setCount("media", by.media.length, "file", "file");
     setCount("doc", by.doc.length, "file", "file");
     setCount("folders", state.folders.length, "cartella", "cartelle");
+    renderCalTile();
 
     // Nei riquadri niente anteprime: solo icona, nome e numero (Davide preferisce così)
 
@@ -767,6 +781,7 @@
     doc: '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>',
     folder: ICONS.folder,
     bell: ICONS.bell,
+    cal: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
     clip: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
   };
@@ -825,11 +840,106 @@
     toast("Cartella eliminata");
   });
 
+  // ---------- Calendario ----------
+  const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const dkey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const fromKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  state.calDay = dkey(new Date());
+  state.calMonth = state.calDay.slice(0, 7);
+  // cosa c'è in ogni giorno: note del giorno e promemoria
+  function dayIndex() {
+    const idx = new Map();
+    const add = (k, it, type) => { if (!idx.has(k)) idx.set(k, []); const a = idx.get(k); if (!a.some((x) => x.it.id === it.id)) a.push({ it, type }); };
+    for (const it of state.items) {
+      if (it.remind_at) add(dkey(new Date(it.remind_at)), it, "r");
+      if (it.event_date) add(it.event_date, it, it.remind_at && dkey(new Date(it.remind_at)) === it.event_date ? "r" : "n");
+    }
+    return idx;
+  }
+  function dayItems(idx, k) {
+    return (idx.get(k) || []).map((x) => x.it).sort((a, b) => {
+      const ta = a.remind_at ? new Date(a.remind_at).getTime() : Infinity, tb = b.remind_at ? new Date(b.remind_at).getTime() : Infinity;
+      return ta - tb || new Date(a.created_at) - new Date(b.created_at);
+    });
+  }
+  function renderCal(freshId) {
+    const idx = dayIndex();
+    const [y, m] = state.calMonth.split("-").map(Number);
+    $("cal-month").textContent = `${MONTHS[m - 1]} ${y}`;
+    const first = new Date(y, m - 1, 1);
+    const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7)); // parte dal lunedì
+    const days = new Date(y, m, 0).getDate();
+    const cells = Math.ceil((((first.getDay() + 6) % 7) + days) / 7) * 7;
+    const today = dkey(new Date());
+    let html = "";
+    for (let i = 0; i < cells; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const k = dkey(d);
+      const ev = idx.get(k) || [];
+      const n = ev.filter((x) => x.type === "n").length, r = ev.filter((x) => x.type === "r").length;
+      const cls = ["cal-cell", d.getMonth() !== m - 1 ? "out" : "", k === today ? "today" : "", k === state.calDay ? "sel" : "", ev.length ? "has" : "", d.getDay() === 0 ? "sun" : ""].filter(Boolean).join(" ");
+      html += `<button class="${cls}" data-day="${k}" type="button" aria-label="${d.getDate()} ${MONTHS[d.getMonth()]}${ev.length ? ", " + ev.length + " cose" : ""}">
+        <span class="cn">${d.getDate()}</span>
+        <span class="cd">${"<i class='dot n'></i>".repeat(Math.min(n, 3))}${"<i class='dot r'></i>".repeat(Math.min(r, 3))}</span></button>`;
+    }
+    $("cal-grid").innerHTML = html;
+    // il giorno scelto
+    const sel = fromKey(state.calDay);
+    const label = sel.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+    $("cal-day-title").textContent = state.calDay === today ? "Oggi" : label.charAt(0).toUpperCase() + label.slice(1);
+    const list = dayItems(idx, state.calDay);
+    $("cal-day-sub").textContent = (state.calDay === today ? label + " · " : "") + (list.length ? (list.length === 1 ? "1 cosa" : list.length + " cose") : "niente in programma");
+    $("cal-list").innerHTML = list.map((i) => rowHtml(i, i.id === freshId)).join("");
+    $("cal-list").classList.toggle("hidden", !list.length);
+    $("cal-empty").classList.toggle("hidden", list.length > 0);
+  }
+  function calMove(delta) {
+    const [y, m] = state.calMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    state.calMonth = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+    renderCal();
+  }
+  $("cal-prev").addEventListener("click", () => calMove(-1));
+  $("cal-next").addEventListener("click", () => calMove(1));
+  $("cal-today").addEventListener("click", () => { state.calDay = dkey(new Date()); state.calMonth = state.calDay.slice(0, 7); renderCal(); });
+  $("cal-grid").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-day]"); if (!b) return;
+    state.calDay = b.dataset.day;
+    if (b.dataset.day.slice(0, 7) !== state.calMonth) state.calMonth = b.dataset.day.slice(0, 7);
+    renderCal();
+    if (IS_MOBILE) setTimeout(() => $("cal-day-title").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  });
+  // sul telefono: scorri a destra o sinistra per cambiare mese
+  let sx = null, sy = null;
+  $("cal-grid").addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+  $("cal-grid").addEventListener("touchend", (e) => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) calMove(dx < 0 ? 1 : -1);
+    sx = null;
+  });
+  $("cal-add-note").addEventListener("click", () => openNote({ day: state.calDay }));
+  $("cal-add-rem").addEventListener("click", () => openNote({ day: state.calDay, remind: true }));
+  $("cal-list").addEventListener("click", onItemClick);
+  function renderCalTile() {
+    const now = new Date();
+    $("tc-wd").textContent = now.toLocaleDateString("it-IT", { weekday: "short" });
+    $("tc-day").textContent = now.getDate();
+    const idx = dayIndex();
+    const todayList = dayItems(idx, dkey(now));
+    $("tc-sub").textContent = todayList.length ? (todayList.length === 1 ? "1 cosa oggi" : todayList.length + " cose oggi") : "Niente in programma oggi";
+    const next = state.items.filter((i) => i.remind_at && new Date(i.remind_at) > now).sort((a, b) => new Date(a.remind_at) - new Date(b.remind_at))[0];
+    $("tc-next").innerHTML = next ? `<span class="tcn-l">Prossimo</span><span class="tcn-t">${esc(plainText(next).split("\n")[0].replace(/^[•✓] /, "").slice(0, 60))}</span><span class="tcn-w">${esc(fmtWhen(next.remind_at))}</span>` : "";
+  }
+
   // ---------- Promemoria e notifiche ----------
   function remBadge(item) {
-    if (!item.remind_at) return "";
+    const day = item.event_date && state.screen !== "calendar" && !(item.remind_at && dkey(new Date(item.remind_at)) === item.event_date)
+      ? `<span class="rem day">📅 ${esc(fromKey(item.event_date).toLocaleDateString("it-IT", { day: "numeric", month: "short" }))}</span> ` : "";
+    if (!item.remind_at) return day;
     const past = item.reminded || new Date(item.remind_at) < new Date();
-    return `<button class="rem${past ? " past" : ""}" data-act="remind" title="Cambia promemoria">${ICONS.bell}${esc(fmtWhen(item.remind_at))}</button> `;
+    return day + `<button class="rem${past ? " past" : ""}" data-act="remind" title="Cambia promemoria">${ICONS.bell}${esc(state.screen === "calendar" ? new Date(item.remind_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : fmtWhen(item.remind_at))}</button> `;
   }
   function fmtWhen(iso) {
     const d = new Date(iso), now = new Date();
@@ -1020,12 +1130,16 @@
   function openNote(opts) {
     const cur = state.folders.find((f) => f.id === state.folder);
     const rem = opts && opts.remind;
-    $("note-dlg-title").textContent = rem ? "Nuovo promemoria" : cur ? "Nota in " + cur.name : "Nuova nota";
+    state.noteDay = (opts && opts.day) || null;
+    const dayLabel = state.noteDay && fromKey(state.noteDay).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+    $("note-dlg-title").textContent = rem ? (dayLabel ? "Promemoria · " + dayLabel : "Nuovo promemoria") : dayLabel ? "Nota · " + dayLabel : cur ? "Nota in " + cur.name : "Nuova nota";
     $("note-save").disabled = !noteInput.value.trim();
     setNoteMode(opts && opts.list ? "list" : "text");
     if (rem) {
       noteInput.placeholder = "Di cosa vuoi che ti ricordi?";
-      $("note-remind").value = toLocalInput(new Date(Math.ceil((Date.now() + 3600e3) / 900e3) * 900e3)); // tra circa un'ora
+      let when = new Date(Math.ceil((Date.now() + 3600e3) / 900e3) * 900e3); // tra circa un'ora
+      if (state.noteDay && state.noteDay !== dkey(new Date())) { when = fromKey(state.noteDay); when.setHours(9, 0, 0, 0); } // un altro giorno: alle 9
+      $("note-remind").value = toLocalInput(when);
       $("note-remind-clear").classList.remove("hidden");
     } else if (!noteInput.value.trim()) {
       $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden");
@@ -1036,6 +1150,7 @@
   }
   function onAdd() {
     if (state.screen === "folders") return openFolderName(null);
+    if (state.screen === "calendar") return openNote({ day: state.calDay });
     if (state.screen === "list" && !state.folder && !state.q) {
       if (state.filter === "note") return openNote();
       if (state.filter === "media" || state.filter === "doc") return pickFiles(state.filter);

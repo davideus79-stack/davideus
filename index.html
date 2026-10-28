@@ -99,6 +99,7 @@
 
         <nav class="side-nav tabs" role="tablist" aria-label="Tipo">
           <button class="tab" data-go="home"><span class="ti" data-ico="home"></span><span class="tl">Home</span></button>
+          <button class="tab" data-go="calendar"><span class="ti" data-ico="cal"></span><span class="tl">Calendario</span></button>
           <button class="tab" data-go="list" data-filter="all"><span class="ti" data-ico="all"></span><span class="tl">Tutto</span><span class="tc" data-count="all"></span></button>
           <button class="tab" data-go="list" data-filter="note"><span class="ti" data-ico="note"></span><span class="tl">Note</span><span class="tc" data-count="note"></span></button>
           <button class="tab" data-go="list" data-filter="media"><span class="ti" data-ico="media"></span><span class="tl">Foto e video</span><span class="tc" data-count="media"></span></button>
@@ -153,6 +154,12 @@
               <span class="tile-n"><b data-tile-count="folders">0</b> <small data-tile-unit="folders">cartelle</small></span>
             </button>
           </div>
+          <button class="tile tile-cal" data-go="calendar" type="button" style="--c:var(--t-cal)">
+            <span class="tc-date"><span id="tc-wd">mer</span><b id="tc-day">28</b></span>
+            <span class="tc-main"><span class="tile-name">Calendario</span><span id="tc-sub" class="tc-sub">Niente in programma oggi</span></span>
+            <span class="tc-next" id="tc-next"></span>
+          </button>
+
           <div id="clip" class="clip">
             <div class="clip-head">
               <span class="clip-ico" data-ico="clip"></span>
@@ -173,6 +180,31 @@
             <div class="recent-head"><h2>Ultimi arrivati</h2><button class="link-btn" data-go="list" data-filter="all" type="button">Vedi tutto</button></div>
             <div id="recent" class="list as-list"></div>
             <div id="recent-empty" class="recent-empty hidden">Qui vedrai le ultime note e gli ultimi file, da qualsiasi dispositivo. Tocca <b>+</b> per iniziare.</div>
+          </div>
+        </section>
+
+        <section id="cal" class="cal hidden">
+          <div class="cal-box">
+            <div class="cal-head">
+              <button id="cal-prev" class="icon-btn cal-nav" type="button" aria-label="Mese prima"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <h3 id="cal-month">Ottobre 2026</h3>
+              <button id="cal-next" class="icon-btn cal-nav" type="button" aria-label="Mese dopo"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+              <button id="cal-today" class="btn soft small" type="button">Oggi</button>
+            </div>
+            <div class="cal-wd"><span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span></div>
+            <div id="cal-grid" class="cal-grid"></div>
+            <div class="cal-legend"><span><i class="dot n"></i>Note</span><span><i class="dot r"></i>Promemoria</span></div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-day-head">
+              <div><h3 id="cal-day-title">Oggi</h3><div id="cal-day-sub" class="mh-sub"></div></div>
+              <div class="cal-day-add">
+                <button id="cal-add-note" class="btn soft small" type="button">+ Nota</button>
+                <button id="cal-add-rem" class="btn primary small" type="button">+ Promemoria</button>
+              </div>
+            </div>
+            <div id="cal-list" class="list as-list"></div>
+            <div id="cal-empty" class="recent-empty hidden">Niente per questo giorno. Aggiungi una nota o un promemoria.</div>
           </div>
         </section>
 
