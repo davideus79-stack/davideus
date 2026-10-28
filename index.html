@@ -83,42 +83,62 @@
       </div>
     </header>
 
-    <section class="composer glass">
-      <textarea id="note-input" rows="3" placeholder="Scrivi una nota…"></textarea>
-      <div class="composer-actions">
-        <label class="btn soft" for="file-input">
-          <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-          <span>Carica file</span>
+    <div class="shell">
+      <aside class="side">
+        <section class="composer glass">
+          <textarea id="note-input" rows="2" placeholder="Scrivi una nota…"></textarea>
+          <div class="composer-actions">
+            <label class="btn soft" for="file-input">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+              <span>Carica file</span>
+            </label>
+            <input id="file-input" type="file" multiple hidden>
+            <button id="note-save" class="btn primary" disabled>Salva nota</button>
+          </div>
+          <div class="drop-hint">oppure trascina qui i file</div>
+        </section>
+
+        <div id="uploads" class="uploads"></div>
+
+        <nav class="side-nav tabs" role="tablist" aria-label="Tipo">
+          <button class="tab active" data-filter="all"><span class="ti" data-ico="all"></span><span class="tl">Tutto</span><span class="tc" data-count="all"></span></button>
+          <button class="tab" data-filter="note"><span class="ti" data-ico="note"></span><span class="tl">Note</span><span class="tc" data-count="note"></span></button>
+          <button class="tab" data-filter="media"><span class="ti" data-ico="media"></span><span class="tl">Foto e video</span><span class="tc" data-count="media"></span></button>
+          <button class="tab" data-filter="doc"><span class="ti" data-ico="doc"></span><span class="tl">Documenti</span><span class="tc" data-count="doc"></span></button>
+        </nav>
+
+        <div class="side-label">Cartelle</div>
+        <div id="folder-bar" class="folders"></div>
+      </aside>
+
+      <main class="main">
+        <div class="main-head">
+          <button id="folder-back" class="icon-btn back hidden" aria-label="Torna a tutte"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <div class="mh-text">
+            <h2 id="main-title" class="mh-title">Tutto</h2>
+            <div id="main-sub" class="mh-sub"></div>
+          </div>
+          <div class="mh-actions">
+            <button id="folder-rename" class="btn soft small hidden">Rinomina</button>
+            <button id="folder-delete" class="btn soft small danger-soft hidden">Elimina</button>
+            <div id="view-toggle" class="view-toggle" role="group" aria-label="Vista">
+              <button data-view="grid" aria-label="Vista a schede" title="Vista a schede"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></button>
+              <button data-view="list" aria-label="Vista a elenco" title="Vista a elenco"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <label class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search" type="search" placeholder="Cerca tra note e file" autocomplete="off">
         </label>
-        <input id="file-input" type="file" multiple hidden>
-        <button id="note-save" class="btn primary" disabled>Salva nota</button>
-      </div>
-      <div class="drop-hint">oppure trascina qui i file</div>
-    </section>
 
-    <div id="uploads" class="uploads"></div>
-
-    <div id="folder-bar" class="folder-bar"></div>
-    <div id="folder-head" class="folder-head hidden">
-      <button id="folder-back" class="icon-btn" aria-label="Torna a tutte"><svg viewBox="0 0 24 24" style="fill:none;stroke:currentColor"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <div class="fh-text"><div id="folder-title" class="fh-title"></div><div id="folder-count" class="fh-sub"></div></div>
-      <button id="folder-rename" class="btn soft small">Rinomina</button>
-      <button id="folder-delete" class="btn soft small danger-soft">Elimina</button>
-    </div>
-
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-filter="all">Tutto</button>
-      <button class="tab" data-filter="note">Note</button>
-      <button class="tab" data-filter="media">Foto e video</button>
-      <button class="tab" data-filter="doc">Documenti</button>
-    </nav>
-
-    <section id="list" class="list"></section>
-    <div id="empty" class="empty hidden">
-      <div class="empty-art">✨</div>
-      <p><b>Ancora niente qui.</b></p>
-      <p class="muted">Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.</p>
-      <p id="empty-folder" class="muted hidden">Quello che crei mentre sei in questa cartella finisce qui dentro. Puoi anche spostarci le cose con il tasto cartella su ogni scheda.</p>
+        <section id="list" class="list"></section>
+        <div id="empty" class="empty hidden">
+          <div class="empty-art">✨</div>
+          <p><b id="empty-title">Ancora niente qui.</b></p>
+          <p id="empty-text" class="muted">Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.</p>
+        </div>
+      </main>
     </div>
   </div>
 

@@ -16,7 +16,10 @@
   try { CAN_SHARE_FILES = IS_MOBILE && !!navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.txt", { type: "text/plain" })] }); } catch (e) {}
 
   const $ = (id) => document.getElementById(id);
-  const state = { folders: [], folder: null, blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
+  // Sul telefono si parte con l'elenco (più ordinato), sul PC con le schede
+  let savedView = /iPhone|iPad|Android/.test(navigator.userAgent) ? "list" : "grid";
+  try { savedView = localStorage.getItem("myhome-view") || savedView; } catch (e) {}
+  const state = { view: savedView, q: "", openNotes: new Set(), folders: [], folder: null, blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
 
   // ---------- Utilità ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -89,6 +92,7 @@
     del: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0-12L8 7m4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
     folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>',
+    note: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></svg>',
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
     back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></svg>',
@@ -381,14 +385,80 @@
     })
   );
 
+  const FILTER_LABELS = { all: "Tutto", note: "Note", media: "Foto e video", doc: "Documenti" };
+  const matchesQ = (i) => {
+    if (!state.q) return true;
+    const t = ((i.kind === "note" ? i.content : i.file_name) || "").toLowerCase();
+    return t.includes(state.q);
+  };
+
   function render(freshId) {
     renderFolders();
+    const inFolder = !!state.folder;
+    const scope = state.items.filter((i) => (!inFolder || i.folder_id === state.folder) && matchesQ(i));
+    // numeri accanto a Tutto / Note / Foto / Documenti
+    const counts = { all: scope.length, note: 0, media: 0, doc: 0 };
+    scope.forEach((i) => counts[category(i)]++);
+    document.querySelectorAll("[data-count]").forEach((el) => (el.textContent = counts[el.dataset.count] || ""));
+    const items = scope.filter((i) => state.filter === "all" || category(i) === state.filter);
+
+    // dentro una cartella: sempre elenco semplice, senza anteprime
+    const view = inFolder ? "list" : state.view;
     const list = $("list");
-    const items = state.items.filter((i) =>
-      (state.filter === "all" || category(i) === state.filter) && (!state.folder || i.folder_id === state.folder));
+    list.className = "list " + (view === "list" ? "as-list" : "as-grid");
+    document.querySelectorAll("#view-toggle [data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
+    $("view-toggle").classList.toggle("hidden", inFolder);
+
+    const cur = state.folders.find((f) => f.id === state.folder);
+    $("main-title").textContent = cur ? cur.name : state.q ? "Risultati" : FILTER_LABELS[state.filter];
+    $("main-sub").textContent = countLabel(items.length) + (cur && state.filter !== "all" ? " · " + FILTER_LABELS[state.filter] : "");
+
     $("empty").classList.toggle("hidden", items.length > 0);
-    $("empty-folder").classList.toggle("hidden", !state.folder);
-    list.innerHTML = items.map((i) => cardHtml(i, i.id === freshId)).join("");
+    $("empty-title").textContent = state.q ? "Nessun risultato." : cur ? "Cartella vuota." : "Ancora niente qui.";
+    $("empty-text").textContent = state.q ? "Prova con un'altra parola."
+      : cur ? "Quello che scrivi o carichi mentre sei qui finisce in questa cartella. Puoi anche spostarci le cose con il tasto cartella."
+      : "Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.";
+    list.innerHTML = items.map((i) => (view === "list" ? rowHtml(i, i.id === freshId) : cardHtml(i, i.id === freshId))).join("");
+  }
+
+  // Riga semplice (vista elenco e dentro le cartelle): icona, nome, dettagli, azioni
+  function rowHtml(item, fresh) {
+    const fold = !state.folder && item.folder_id && state.folders.find((f) => f.id === item.folder_id);
+    const meta = [item.kind === "file" ? fmtSize(item.size_bytes) : "", fmtDate(item.created_at), item.source ? fromLabel(item.source) : ""]
+      .filter(Boolean).join(" · ")
+      + (fold ? ` · <span class="in-folder" style="--fc:${fold.color || "#6366f1"}">${ICONS.folder}${esc(fold.name)}</span>` : "");
+    const cat = category(item);
+    let ico, name, actions;
+    if (item.kind === "note") {
+      const editing = state.editing === item.id;
+      const open = editing || state.openNotes.has(item.id);
+      ico = `<span class="row-ico" style="--rc:${tileColor(item)}">${ICONS.note}</span>`;
+      name = `<button class="row-name" data-act="expand">${esc((item.content || "").split("\n")[0].slice(0, 120))}</button>`;
+      actions = `<button class="ra" data-act="copy" title="Copia" aria-label="Copia">${ICONS.copy}</button>
+        <button class="ra" data-act="${editing ? "save" : "edit"}" title="${editing ? "Fatto" : "Modifica"}" aria-label="Modifica">${editing ? ICONS.save : ICONS.edit}</button>
+        <button class="ra" data-act="move" title="Sposta" aria-label="Sposta in una cartella">${ICONS.folder}</button>
+        <button class="ra del" data-act="delete" title="Cancella" aria-label="Cancella">${ICONS.del}</button>`;
+      return `<article class="row${fresh ? " fresh" : ""}${open ? " open" : ""}" data-id="${item.id}" data-cat="note">
+        <div class="row-top">${ico}<div class="row-main">${name}<div class="meta">${meta}</div></div><div class="row-actions">${actions}</div></div>
+        ${open ? `<p class="note-text row-note" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>` : ""}
+      </article>`;
+    }
+    const st = fileStyle(item);
+    const m = item.mime_type || "";
+    const label = m.startsWith("image/") ? "FOTO" : m.startsWith("video/") ? "VIDEO" : st.label;
+    const color = m.startsWith("image/") ? "#0ea5e9" : m.startsWith("video/") ? "#e11d48" : st.color;
+    ico = `<span class="row-ico file" style="--rc:${color}">${label}</span>`;
+    const canView = cat === "media" || m === "application/pdf";
+    name = `<button class="row-name" data-act="${canView ? "view" : CAN_SHARE_FILES ? "share" : "download"}">${esc(item.file_name)}</button>`;
+    actions = `${canView ? `<button class="ra" data-act="view" title="Apri" aria-label="Apri">${ICONS.open}</button>` : ""}
+      ${CAN_SHARE_FILES
+        ? `<button class="ra" data-act="share" title="Salva" aria-label="Salva">${ICONS.share}</button>`
+        : `<button class="ra" data-act="download" title="Scarica" aria-label="Scarica">${ICONS.down}</button>`}
+      <button class="ra" data-act="move" title="Sposta" aria-label="Sposta in una cartella">${ICONS.folder}</button>
+      <button class="ra del" data-act="delete" title="Cancella" aria-label="Cancella">${ICONS.del}</button>`;
+    return `<article class="row${fresh ? " fresh" : ""}" data-id="${item.id}" data-cat="${cat}">
+      <div class="row-top">${ico}<div class="row-main">${name}<div class="meta">${meta}</div></div><div class="row-actions">${actions}</div></div>
+    </article>`;
   }
 
   function fromLabel(src) { return src === "PC" ? "dal PC" : src === "iPhone" ? "dall'iPhone" : src === "iPad" ? "dall'iPad" : "dal " + src; }
@@ -444,12 +514,15 @@
   $("list").addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
-    const card = btn.closest(".card");
+    const card = btn.closest(".card, .row");
     const item = state.items.find((i) => i.id === card.dataset.id);
     if (!item) return;
     const act = btn.dataset.act;
     try {
-      if (act === "copy") {
+      if (act === "expand") {
+        state.openNotes.has(item.id) ? state.openNotes.delete(item.id) : state.openNotes.add(item.id);
+        render();
+      } else if (act === "copy") {
         await navigator.clipboard.writeText(item.content || "");
         toast("Copiato");
       } else if (act === "edit") {
@@ -492,6 +565,23 @@
     }
   });
 
+  // ---------- Ricerca e vista ----------
+  $("search").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); render(); });
+  $("view-toggle").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-view]");
+    if (!b) return;
+    state.view = b.dataset.view;
+    try { localStorage.setItem("myhome-view", state.view); } catch (err) {}
+    render();
+  });
+  const FILTER_ICONS = {
+    all: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
+    note: ICONS.note,
+    media: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 8"/></svg>',
+    doc: '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>',
+  };
+  document.querySelectorAll("[data-ico]").forEach((el) => (el.innerHTML = FILTER_ICONS[el.dataset.ico]));
+
   // ---------- Cartelle ----------
   const FOLDER_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#ef4444", "#ec4899", "#14b8a6", "#64748b"];
   const sortFolders = () => state.folders.sort((a, b) => a.name.localeCompare(b.name, "it", { sensitivity: "base" }));
@@ -499,17 +589,14 @@
   function renderFolders() {
     const cur = state.folders.find((f) => f.id === state.folder);
     $("note-input").placeholder = cur ? `Scrivi una nota in "${cur.name}"…` : "Scrivi una nota…";
-    $("folder-bar").classList.toggle("hidden", !!cur);
-    $("folder-head").classList.toggle("hidden", !cur);
-    if (cur) {
-      $("folder-title").textContent = cur.name;
-      $("folder-head").style.setProperty("--fc", cur.color || "#6366f1");
-      $("folder-count").textContent = countLabel(state.items.filter((i) => i.folder_id === cur.id).length);
-      return;
-    }
+    $("app").classList.toggle("in-folder", !!cur);
+    $("folder-back").classList.toggle("hidden", !cur);
+    $("folder-rename").classList.toggle("hidden", !cur);
+    $("folder-delete").classList.toggle("hidden", !cur);
+    document.querySelector(".main-head").style.setProperty("--fc", cur ? cur.color || "#6366f1" : "transparent");
     $("folder-bar").innerHTML = state.folders.map((f) => {
       const n = state.items.filter((i) => i.folder_id === f.id).length;
-      return `<button class="folder-chip" data-folder="${f.id}" style="--fc:${f.color || "#6366f1"}">
+      return `<button class="folder-chip${f.id === state.folder ? " on" : ""}" data-folder="${f.id}" style="--fc:${f.color || "#6366f1"}">
         <span class="fico">${ICONS.folder}</span><span class="fname">${esc(f.name)}</span><span class="fnum">${n}</span></button>`;
     }).join("") + `<button class="folder-chip add" data-folder-new="1"><span class="fico">${ICONS.plus}</span><span class="fname">Nuova cartella</span></button>`;
   }
@@ -519,7 +606,9 @@
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.folderNew) return openFolderName(null);
-    state.folder = b.dataset.folder;
+    state.folder = state.folder === b.dataset.folder ? null : b.dataset.folder;
+    state.filter = "all";
+    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.dataset.filter === "all"));
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -607,6 +696,10 @@
 
   // Prepara il file e apre il menu Condividi dell'iPhone, da cui si salva in Foto o in File.
   async function shareFile(item, btn) {
+    if (btn.classList.contains("ra") || btn.classList.contains("row-name")) {
+      const orig = btn.innerHTML;
+      btn = { set innerHTML(v) { /* nella riga resta solo l'icona */ }, get innerHTML() { return orig; }, _el: btn };
+    }
     let file = state.blobs.get(item.id);
     if (!file) {
       btn.innerHTML = '<span class="spinner"></span>Preparo…';
