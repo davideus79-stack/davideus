@@ -78,6 +78,8 @@
           <button class="swatch" data-theme-pick="oro" title="Oro" style="--a:#0e0d0b;--b:#d4af37;--c:#1a1814"><span>Oro</span></button>
         </div>
         <button id="lock-toggle" class="menu-item hidden">Attiva sblocco con Face ID</button>
+        <button id="push-toggle" class="menu-item">Attiva le notifiche su questo dispositivo</button>
+        <button id="share-setup" class="menu-item">Manda file dal tasto Condividi dell'iPhone</button>
         <button id="delete-all" class="menu-item danger">Cancella tutto</button>
         <button id="logout" class="menu-item">Esci</button>
       </div>
@@ -212,9 +214,56 @@
       </div>
       <div id="note-mode" class="note-mode" role="group" aria-label="Tipo di nota">
         <button type="button" data-mode="text" class="on">Testo</button>
-        <button type="button" data-mode="list">Lista di cose da fare</button>
+        <button type="button" data-mode="list">Lista con le spunte</button>
       </div>
       <textarea id="note-input" rows="7" placeholder="Scrivi una nota…"></textarea>
+      <label class="note-remind">
+        <span class="nr-ico" data-ico="bell"></span><span class="nr-l">Ricordamelo</span>
+        <input id="note-remind" type="datetime-local">
+        <button id="note-remind-clear" class="nr-x hidden" type="button" aria-label="Togli il promemoria">×</button>
+      </label>
+    </div>
+  </dialog>
+
+  <!-- Promemoria di una nota -->
+  <dialog id="rm-dlg" class="fid-dlg">
+    <form id="rm-form" class="fid-card" method="dialog">
+      <h2>Promemoria</h2>
+      <p class="muted">Ti arriva una notifica su iPhone e PC all'ora che scegli.</p>
+      <div class="rm-quick">
+        <button type="button" data-q="1h">Tra 1 ora</button>
+        <button type="button" data-q="sera">Stasera alle 20</button>
+        <button type="button" data-q="domani">Domani alle 9</button>
+      </div>
+      <label class="field"><span>Giorno e ora</span><input id="rm-input" type="datetime-local" required></label>
+      <button id="rm-save" class="btn primary big" type="submit">Salva promemoria</button>
+      <button id="rm-clear" class="btn soft big danger-soft hidden" type="button">Togli il promemoria</button>
+      <button id="rm-cancel" class="link" type="button">Annulla</button>
+    </form>
+  </dialog>
+
+  <!-- Tasto Condividi dell'iPhone -->
+  <dialog id="sh-dlg" class="fid-dlg sh-dlg">
+    <div class="fid-card sh-card">
+      <h2>Manda a MyHome dal tasto Condividi</h2>
+      <p class="muted">Da Foto, WhatsApp, File o Safari tocchi Condividi, scegli <b>Manda a MyHome</b> e arriva subito anche sul PC. Si prepara una volta sola, in 2 minuti, con l'app <b>Comandi</b> dell'iPhone.</p>
+      <div class="sh-link">
+        <div class="sh-l">Il tuo indirizzo personale</div>
+        <code id="sh-url">…</code>
+        <button id="sh-copy" class="btn primary" type="button">Copia indirizzo</button>
+      </div>
+      <ol class="sh-steps">
+        <li>Apri l'app <b>Comandi</b> e tocca <b>+</b> in alto a destra.</li>
+        <li>Tocca il nome in alto e chiamalo <b>Manda a MyHome</b>.</li>
+        <li>Tocca <b>Cerca azioni</b>, scrivi <b>URL</b> e scegli <b>Ottieni contenuti dell'URL</b>.</li>
+        <li>Tocca la parola <b>URL</b> e incolla l'indirizzo che hai copiato.</li>
+        <li>Tocca la freccia <b>›</b> accanto: <b>Metodo</b> → <b>POST</b>; <b>Corpo richiesta</b> → <b>Modulo</b>.</li>
+        <li>Tocca <b>Aggiungi nuovo campo</b> → <b>File</b>. Come chiave scrivi <b>file</b>; come valore tocca e scegli <b>Input comando rapido</b>.</li>
+        <li>Tocca la <b>ⓘ</b> in basso (o il nome in alto → Dettagli) e attiva <b>Mostra nel foglio di condivisione</b>. Fatto.</li>
+      </ol>
+      <p class="muted sh-tip">Prova: apri una foto, tocca Condividi e scegli Manda a MyHome. Funziona anche con PDF, Word, Excel, link e testi.</p>
+      <button id="sh-new" class="link" type="button">Cambia codice (il vecchio comando smette di funzionare)</button>
+      <button id="sh-close" class="btn soft big" type="button">Chiudi</button>
     </div>
   </dialog>
 

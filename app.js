@@ -97,6 +97,7 @@
     back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></svg>',
     star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>',
+    bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
     list: '<svg viewBox="0 0 24 24"><path d="m4 6 1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9"/></svg>',
   };
 
@@ -227,6 +228,9 @@
     state.justLoggedIn = false;
     await loadItems();
     loadClip();
+    updatePushUi();
+    // se le notifiche erano già permesse, tiene aggiornata l'iscrizione di questo dispositivo
+    if (PUSH_OK && Notification.permission === "granted") ensurePush(Promise.resolve("granted"));
     subscribe();
   }
 
@@ -318,6 +322,8 @@
   $("note-mode").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) setNoteMode(b.dataset.mode); });
 
   async function saveNote() {
+    // il permesso per le notifiche va chiesto subito, nello stesso tocco
+    const permAsk = $("note-remind").value ? askPermission() : null;
     let text = noteInput.value.trim();
     if (text && state.noteMode === "list") {
       text = text.split("\n").map((l) => l.trim().replace(/^[-•*]\s*/, "")).filter(Boolean)
@@ -325,9 +331,13 @@
     }
     if (!text) return;
     $("note-save").disabled = true;
-    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder }).select().single();
+    const rv = $("note-remind").value;
+    const remind_at = rv ? new Date(rv).toISOString() : null;
+    if (remind_at) ensurePush(permAsk);
+    const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder, remind_at }).select().single();
     if (error) { toast(translateError(error)); $("note-save").disabled = false; return; }
     noteInput.value = "";
+    $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden");
     $("note-dlg").close();
     if (!state.items.some((i) => i.id === data.id)) state.items.unshift(data);
     render(data.id);
@@ -575,7 +585,7 @@
   // Riga semplice (vista elenco e dentro le cartelle): icona, nome, dettagli, azioni
   function rowHtml(item, fresh) {
     const fold = !state.folder && item.folder_id && state.folders.find((f) => f.id === item.folder_id);
-    const meta = [item.kind === "file" ? fmtSize(item.size_bytes) : "", fmtDate(item.created_at), item.source ? fromLabel(item.source) : ""]
+    const meta = remBadge(item) + [item.kind === "file" ? fmtSize(item.size_bytes) : "", fmtDate(item.created_at), item.source ? fromLabel(item.source) : ""]
       .filter(Boolean).join(" · ")
       + (fold ? ` · <span class="in-folder" style="--fc:${fold.color || "#6366f1"}">${ICONS.folder}${esc(fold.name)}</span>` : "");
     const cat = category(item);
@@ -594,6 +604,7 @@
       return `<article class="row${fresh ? " fresh" : ""}${open ? " open" : ""}" data-id="${item.id}" data-cat="note">
         <div class="row-top">${ico}<div class="row-main">${name}<div class="meta">${meta}</div></div><div class="row-actions">${actions}</div></div>
         ${open ? (list ? `<div class="row-note row-list">${listHtml(item)}</div>` : `<p class="note-text row-note" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>`) : ""}
+        ${open && !item.remind_at ? `<button class="row-remind" data-act="remind">${ICONS.bell}Aggiungi un promemoria</button>` : ""}
       </article>`;
     }
     const st = fileStyle(item);
@@ -618,7 +629,7 @@
 
   function cardHtml(item, fresh) {
     const fold = !state.folder && item.folder_id && state.folders.find((f) => f.id === item.folder_id);
-    const meta = fmtDate(item.created_at) + (item.source ? ` · <span class="src">${esc(fromLabel(item.source))}</span>` : "")
+    const meta = remBadge(item) + fmtDate(item.created_at) + (item.source ? ` · <span class="src">${esc(fromLabel(item.source))}</span>` : "")
       + (fold ? ` · <span class="in-folder" style="--fc:${fold.color || "#6366f1"}">${ICONS.folder}${esc(fold.name)}</span>` : "");
     if (item.kind === "note") {
       const editing = state.editing === item.id;
@@ -629,7 +640,8 @@
         </div>
         <div class="card-actions">
           ${starBtn(item, "act icon")}
-          <button class="act" data-act="copy">${ICONS.copy}Copia</button>
+          <button class="act icon" data-act="remind" title="Promemoria" aria-label="Promemoria">${ICONS.bell}</button>
+          <button class="act icon" data-act="copy" title="Copia" aria-label="Copia">${ICONS.copy}</button>
           ${isList(item) ? "" : `<button class="act" data-act="${editing ? "save" : "edit"}">${editing ? ICONS.save + "Fatto" : ICONS.edit + "Modifica"}</button>`}
           <button class="act icon" data-act="move" aria-label="Sposta in una cartella" title="Sposta in una cartella">${ICONS.folder}</button>
           <button class="act del" data-act="delete" aria-label="Cancella">${ICONS.del}</button>
@@ -677,6 +689,8 @@
       if (act === "expand") {
         state.openNotes.has(item.id) ? state.openNotes.delete(item.id) : state.openNotes.add(item.id);
         render();
+      } else if (act === "remind") {
+        openRemind(item);
       } else if (act === "fav") {
         const favorite = !item.favorite;
         state.items = state.items.map((i) => (i.id === item.id ? { ...i, favorite } : i));
@@ -752,6 +766,7 @@
     media: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 8"/></svg>',
     doc: '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>',
     folder: ICONS.folder,
+    bell: ICONS.bell,
     clip: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
   };
@@ -809,6 +824,139 @@
     go("folders", {}, "replace");
     toast("Cartella eliminata");
   });
+
+  // ---------- Promemoria e notifiche ----------
+  function remBadge(item) {
+    if (!item.remind_at) return "";
+    const past = item.reminded || new Date(item.remind_at) < new Date();
+    return `<button class="rem${past ? " past" : ""}" data-act="remind" title="Cambia promemoria">${ICONS.bell}${esc(fmtWhen(item.remind_at))}</button> `;
+  }
+  function fmtWhen(iso) {
+    const d = new Date(iso), now = new Date();
+    const time = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    const t = new Date(now); t.setDate(now.getDate() + 1);
+    if (d.toDateString() === now.toDateString()) return "oggi " + time;
+    if (d.toDateString() === t.toDateString()) return "domani " + time;
+    return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }) + " " + time;
+  }
+  const toLocalInput = (d) => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 16); };
+  const PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  function askPermission() {
+    if (!PUSH_OK) return null;
+    return Notification.permission === "default" ? Notification.requestPermission() : Promise.resolve(Notification.permission);
+  }
+  async function ensurePush(permPromise, loud) {
+    if (!PUSH_OK) {
+      if (loud || IS_MOBILE) toast(IS_MOBILE ? "Per le notifiche apri MyHome dall'icona sulla schermata Home (iOS 16.4 o più recente)" : "Questo browser non supporta le notifiche");
+      return false;
+    }
+    const perm = await (permPromise || askPermission());
+    if (perm !== "granted") { toast("Notifiche bloccate: attivale nelle Impostazioni per MyHome"); updatePushUi(); return false; }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(cfg.vapidPublicKey) });
+      const j = sub.toJSON();
+      const { error } = await sb.from("push_subs").upsert({ user_id: state.user.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, device: DEVICE }, { onConflict: "endpoint" });
+      if (error) throw error;
+      if (loud) toast("Notifiche attive su questo dispositivo");
+      updatePushUi(true);
+      return true;
+    } catch (err) { toast("Non riesco ad attivare le notifiche: " + translateError(err)); return false; }
+  }
+  function b64uToBytes(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
+    return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  }
+  async function updatePushUi(on) {
+    const b = $("push-toggle");
+    if (!PUSH_OK) { b.textContent = IS_MOBILE ? "Notifiche: apri MyHome dall'icona Home" : "Notifiche non disponibili qui"; return; }
+    if (on === undefined) {
+      try { const reg = await navigator.serviceWorker.getRegistration(); on = !!(reg && await reg.pushManager.getSubscription()) && Notification.permission === "granted"; } catch (e) { on = false; }
+    }
+    b.textContent = on ? "Notifiche attive ✓ (tocca per provarle)" : "Attiva le notifiche su questo dispositivo";
+    b.dataset.on = on ? "1" : "";
+  }
+  $("push-toggle").addEventListener("click", async () => {
+    const p = askPermission();
+    $("menu").classList.add("hidden");
+    const wasOn = $("push-toggle").dataset.on;
+    const ok = await ensurePush(p, !wasOn);
+    if (ok && wasOn) {
+      const reg = await navigator.serviceWorker.ready;
+      reg.showNotification("⏰ MyHome", { body: "Le notifiche funzionano su questo dispositivo.", icon: "icons/icon-192.png" });
+    }
+  });
+
+  // Finestra promemoria
+  let remItem = null;
+  function openRemind(item) {
+    remItem = item;
+    const d = item.remind_at ? new Date(item.remind_at) : new Date(Date.now() + 3600e3);
+    $("rm-input").value = toLocalInput(d);
+    $("rm-clear").classList.toggle("hidden", !item.remind_at);
+    $("rm-dlg").showModal();
+  }
+  $("rm-dlg").querySelector(".rm-quick").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-q]"); if (!b) return;
+    const d = new Date();
+    if (b.dataset.q === "1h") d.setTime(d.getTime() + 3600e3);
+    else if (b.dataset.q === "sera") { d.setHours(20, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); }
+    else { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+    $("rm-input").value = toLocalInput(d);
+  });
+  $("rm-cancel").addEventListener("click", () => $("rm-dlg").close());
+  async function setReminder(item, iso) {
+    state.items = state.items.map((i) => (i.id === item.id ? { ...i, remind_at: iso, reminded: false } : i));
+    render();
+    const { error } = await sb.from("items").update({ remind_at: iso, reminded: false }).eq("id", item.id);
+    if (error) toast(translateError(error));
+  }
+  $("rm-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const p = askPermission();
+    const v = $("rm-input").value;
+    if (!v || !remItem) return;
+    const d = new Date(v);
+    if (d < new Date(Date.now() - 60e3)) { toast("Scegli un orario nel futuro"); return; }
+    $("rm-dlg").close();
+    await setReminder(remItem, d.toISOString());
+    toast("Promemoria: " + fmtWhen(d.toISOString()));
+    ensurePush(p);
+  });
+  $("rm-clear").addEventListener("click", async () => {
+    $("rm-dlg").close();
+    if (remItem) { await setReminder(remItem, null); toast("Promemoria tolto"); }
+  });
+  $("note-remind").addEventListener("input", () => $("note-remind-clear").classList.toggle("hidden", !$("note-remind").value));
+  $("note-remind-clear").addEventListener("click", (e) => { e.preventDefault(); $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden"); });
+
+  // ---------- Tasto Condividi dell'iPhone (Comando Rapido) ----------
+  const inboxUrl = (t) => `${cfg.supabaseUrl}/functions/v1/inbox?t=${t}`;
+  async function getToken(fresh) {
+    if (fresh) await sb.from("inbox_tokens").delete().eq("user_id", state.user.id);
+    let { data } = await sb.from("inbox_tokens").select("token").maybeSingle();
+    if (!data) {
+      const r = await sb.from("inbox_tokens").insert({ user_id: state.user.id }).select("token").single();
+      if (r.error) throw r.error;
+      data = r.data;
+    }
+    return data.token;
+  }
+  async function openShare(fresh) {
+    $("menu").classList.add("hidden");
+    $("sh-url").textContent = "…";
+    if (!$("sh-dlg").open) $("sh-dlg").showModal();
+    try { $("sh-url").textContent = inboxUrl(await getToken(fresh)); }
+    catch (err) { $("sh-url").textContent = "Errore: " + translateError(err); }
+  }
+  $("share-setup").addEventListener("click", () => openShare(false));
+  $("sh-close").addEventListener("click", () => $("sh-dlg").close());
+  $("sh-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("sh-url").textContent); toast("Indirizzo copiato: ora vai nell'app Comandi"); }
+    catch (e) { toast("Tieni premuto sull'indirizzo per copiarlo"); }
+  });
+  $("sh-new").addEventListener("click", () => { if (confirm("Creo un nuovo codice? Dovrai incollare il nuovo indirizzo nel comando rapido.")) openShare(true); });
 
   // ---------- Appunti condivisi ----------
   async function loadClip() {
