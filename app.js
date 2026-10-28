@@ -96,6 +96,8 @@
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
     back: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>',
+    list: '<svg viewBox="0 0 24 24"><path d="m4 6 1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9"/></svg>',
   };
 
   // ---------- Link temporanei ai file ----------
@@ -224,6 +226,7 @@
     else if (lock.supported && !fidGet() && state.lastPassword) openSetup(); // propone subito il Face ID
     state.justLoggedIn = false;
     await loadItems();
+    loadClip();
     subscribe();
   }
 
@@ -263,6 +266,12 @@
           if (state.items.length !== before) render();
         }
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "clipboard" }, (p) => {
+        if (!p.new || p.new.user_id !== state.user.id) return;
+        const changed = !state.clip || state.clip.content !== p.new.content;
+        state.clip = p.new; renderClip();
+        if (changed && p.new.source && p.new.source !== DEVICE) toast(`Appunti arrivati ${fromLabel(p.new.source)}: tocca Copia`);
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "folders" }, (p) => {
         if (p.eventType === "INSERT") {
           if (p.new.user_id !== state.user.id || state.folders.some((f) => f.id === p.new.id)) return;
@@ -287,7 +296,7 @@
 
   // Quando torni sull'app (dal telefono in tasca o da un'altra finestra) ricarica subito.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && state.user) { loadItems(); subscribe(); }
+    if (document.visibilityState === "visible" && state.user) { loadItems(); loadClip(); subscribe(); }
   });
   window.addEventListener("online", () => { if (state.user) { loadItems(); subscribe(); } });
 
@@ -299,8 +308,21 @@
   });
   $("note-save").addEventListener("click", saveNote);
 
+  state.noteMode = "text";
+  function setNoteMode(m) {
+    state.noteMode = m;
+    $("note-mode").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+    noteInput.placeholder = m === "list" ? "Una cosa da fare per riga, ad esempio:\nLatte\nPane\nChiamare l'idraulico" : "Scrivi una nota…";
+    noteInput.focus();
+  }
+  $("note-mode").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) setNoteMode(b.dataset.mode); });
+
   async function saveNote() {
-    const text = noteInput.value.trim();
+    let text = noteInput.value.trim();
+    if (text && state.noteMode === "list") {
+      text = text.split("\n").map((l) => l.trim().replace(/^[-•*]\s*/, "")).filter(Boolean)
+        .map((l) => (/^\[( |x)\] /i.test(l) ? l : "[ ] " + l)).join("\n");
+    }
     if (!text) return;
     $("note-save").disabled = true;
     const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder }).select().single();
@@ -309,7 +331,7 @@
     $("note-dlg").close();
     if (!state.items.some((i) => i.id === data.id)) state.items.unshift(data);
     render(data.id);
-    toast("Nota salvata");
+    toast(state.noteMode === "list" ? "Lista salvata" : "Nota salvata");
   }
 
   // ---------- File ----------
@@ -450,7 +472,9 @@
     const counts = { all: all.length, note: 0, media: 0, doc: 0 };
     all.forEach((i) => counts[category(i)]++);
     document.querySelectorAll("[data-count]").forEach((el) => (el.textContent = counts[el.dataset.count] || ""));
-    const items = scope.filter((i) => state.filter === "all" || category(i) === state.filter);
+    // i preferiti stanno in cima
+    const items = scope.filter((i) => state.filter === "all" || category(i) === state.filter)
+      .sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
 
     // dentro una cartella: sempre elenco semplice, senza anteprime
     const view = inFolder ? "list" : state.view;
@@ -497,11 +521,56 @@
 
     // Nei riquadri niente anteprime: solo icona, nome e numero (Davide preferisce così)
 
-    const recent = free.slice(0, IS_MOBILE ? 5 : 8);
+    const favs = state.items.filter((i) => i.favorite);
+    $("fav-block").classList.toggle("hidden", !favs.length);
+    $("favs").innerHTML = favs.map((i) => rowHtml(i, i.id === freshId)).join("");
+    renderClip();
+    const recent = free.filter((i) => !i.favorite).slice(0, IS_MOBILE ? 5 : 8);
     $("recent").innerHTML = recent.map((i) => rowHtml(i, i.id === freshId)).join("");
     $("recent").classList.toggle("hidden", !recent.length);
     $("recent-empty").classList.toggle("hidden", recent.length > 0);
   }
+
+  // ---------- Liste di cose da fare: righe "[ ] voce" / "[x] voce" dentro una nota ----------
+  const isList = (item) => item.kind === "note" && /^\[( |x)\] /i.test(item.content || "");
+  function listLines(item) {
+    return (item.content || "").split("\n").filter((l) => l.trim()).map((l) => {
+      const m = l.match(/^\[( |x)\] ?(.*)$/i);
+      return m ? { done: m[1].toLowerCase() === "x", text: m[2] } : { done: false, text: l };
+    });
+  }
+  const listToText = (lines) => lines.map((l) => `[${l.done ? "x" : " "}] ${l.text}`).join("\n");
+  const plainText = (item) => (isList(item) ? listLines(item).map((l) => (l.done ? "✓ " : "• ") + l.text).join("\n") : item.content || "");
+  function listHtml(item) {
+    const L = listLines(item);
+    return `<ul class="todo">${L.map((l, n) => `<li class="${l.done ? "done" : ""}">
+        <button class="tick" data-act="check" data-line="${n}" aria-label="${l.done ? "Togli la spunta" : "Spunta"}">${ICONS.save}</button>
+        <span class="todo-t">${esc(l.text)}</span>
+        <button class="untodo" data-act="unline" data-line="${n}" aria-label="Togli la voce">×</button></li>`).join("")}</ul>
+      <form class="todo-add" data-id="${item.id}"><input placeholder="Aggiungi una voce" maxlength="200" enterkeyhint="done"><button class="ra" aria-label="Aggiungi">${ICONS.plus}</button></form>`;
+  }
+  const listSummary = (item) => { const L = listLines(item); return { done: L.filter((l) => l.done).length, total: L.length, L }; };
+  async function saveList(item, lines) {
+    const content = listToText(lines);
+    state.items = state.items.map((i) => (i.id === item.id ? { ...i, content } : i));
+    render();
+    const { error } = await sb.from("items").update({ content }).eq("id", item.id);
+    if (error) toast(translateError(error));
+  }
+  document.addEventListener("submit", (e) => {
+    const f = e.target.closest(".todo-add");
+    if (!f) return;
+    e.preventDefault();
+    const item = state.items.find((i) => i.id === f.dataset.id);
+    const text = f.querySelector("input").value.trim();
+    if (!item || !text) return;
+    state.openNotes.add(item.id);
+    saveList(item, [...listLines(item), { done: false, text }]).then(() => {
+      const inp = document.querySelector(`.todo-add[data-id="${item.id}"] input`);
+      if (inp) inp.focus();
+    });
+  });
+  const starBtn = (item, cls) => `<button class="${cls} star${item.favorite ? " on" : ""}" data-act="fav" title="${item.favorite ? "Togli dai preferiti" : "Metti nei preferiti"}" aria-label="Preferito">${ICONS.star}</button>`;
 
   // Riga semplice (vista elenco e dentro le cartelle): icona, nome, dettagli, azioni
   function rowHtml(item, fresh) {
@@ -514,15 +583,17 @@
     if (item.kind === "note") {
       const editing = state.editing === item.id;
       const open = editing || state.openNotes.has(item.id);
-      ico = `<span class="row-ico" style="--rc:${tileColor(item)}">${ICONS.note}</span>`;
-      name = `<button class="row-name" data-act="expand">${esc((item.content || "").split("\n")[0].slice(0, 120))}</button>`;
-      actions = `<button class="ra" data-act="copy" title="Copia" aria-label="Copia">${ICONS.copy}</button>
-        <button class="ra" data-act="${editing ? "save" : "edit"}" title="${editing ? "Fatto" : "Modifica"}" aria-label="Modifica">${editing ? ICONS.save : ICONS.edit}</button>
+      const list = isList(item);
+      const ls = list && listSummary(item);
+      ico = `<span class="row-ico" style="--rc:${tileColor(item)}">${list ? ICONS.list : ICONS.note}</span>`;
+      name = `<button class="row-name" data-act="expand">${list ? `<span class="todo-count${ls.done === ls.total ? " all" : ""}">${ls.done}/${ls.total}</span>` + esc(ls.L.map((l) => l.text).join(", ").slice(0, 120)) : esc((item.content || "").split("\n")[0].slice(0, 120))}</button>`;
+      actions = `${starBtn(item, "ra")}<button class="ra" data-act="copy" title="Copia" aria-label="Copia">${ICONS.copy}</button>
+        ${list ? "" : `<button class="ra" data-act="${editing ? "save" : "edit"}" title="${editing ? "Fatto" : "Modifica"}" aria-label="Modifica">${editing ? ICONS.save : ICONS.edit}</button>`}
         <button class="ra" data-act="move" title="Sposta" aria-label="Sposta in una cartella">${ICONS.folder}</button>
         <button class="ra del" data-act="delete" title="Cancella" aria-label="Cancella">${ICONS.del}</button>`;
       return `<article class="row${fresh ? " fresh" : ""}${open ? " open" : ""}" data-id="${item.id}" data-cat="note">
         <div class="row-top">${ico}<div class="row-main">${name}<div class="meta">${meta}</div></div><div class="row-actions">${actions}</div></div>
-        ${open ? `<p class="note-text row-note" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>` : ""}
+        ${open ? (list ? `<div class="row-note row-list">${listHtml(item)}</div>` : `<p class="note-text row-note" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>`) : ""}
       </article>`;
     }
     const st = fileStyle(item);
@@ -532,7 +603,7 @@
     ico = `<span class="row-ico file" style="--rc:${color}">${label}</span>`;
     const canView = cat === "media" || m === "application/pdf";
     name = `<button class="row-name" data-act="${canView ? "view" : CAN_SHARE_FILES ? "share" : "download"}">${esc(item.file_name)}</button>`;
-    actions = `${canView ? `<button class="ra" data-act="view" title="Apri" aria-label="Apri">${ICONS.open}</button>` : ""}
+    actions = `${starBtn(item, "ra")}${canView ? `<button class="ra" data-act="view" title="Apri" aria-label="Apri">${ICONS.open}</button>` : ""}
       ${CAN_SHARE_FILES
         ? `<button class="ra" data-act="share" title="Salva" aria-label="Salva">${ICONS.share}</button>`
         : `<button class="ra" data-act="download" title="Scarica" aria-label="Scarica">${ICONS.down}</button>`}
@@ -553,12 +624,13 @@
       const editing = state.editing === item.id;
       return `<article class="card${fresh ? " fresh" : ""}" data-id="${item.id}" data-cat="note" style="--tile:${tileColor(item)}">
         <div class="card-body">
-          <p class="note-text" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>
+          ${isList(item) ? `<div class="card-list">${listHtml(item)}</div>` : `<p class="note-text" ${editing ? 'contenteditable="true"' : ""}>${esc(item.content)}</p>`}
           <div class="meta">${meta}</div>
         </div>
         <div class="card-actions">
+          ${starBtn(item, "act icon")}
           <button class="act" data-act="copy">${ICONS.copy}Copia</button>
-          <button class="act" data-act="${editing ? "save" : "edit"}">${editing ? ICONS.save + "Fatto" : ICONS.edit + "Modifica"}</button>
+          ${isList(item) ? "" : `<button class="act" data-act="${editing ? "save" : "edit"}">${editing ? ICONS.save + "Fatto" : ICONS.edit + "Modifica"}</button>`}
           <button class="act icon" data-act="move" aria-label="Sposta in una cartella" title="Sposta in una cartella">${ICONS.folder}</button>
           <button class="act del" data-act="delete" aria-label="Cancella">${ICONS.del}</button>
         </div>
@@ -583,6 +655,7 @@
         <div class="meta">${fmtSize(item.size_bytes)} · ${meta}</div>
       </div>
       <div class="card-actions">
+        ${starBtn(item, "act icon")}
         ${canView ? `<button class="act" data-act="view">${ICONS.open}Apri</button>` : ""}
         ${CAN_SHARE_FILES
           ? `<button class="act" data-act="share">${ICONS.share}${state.blobs.has(item.id) ? "Tocca per salvare" : "Salva"}</button>`
@@ -604,8 +677,22 @@
       if (act === "expand") {
         state.openNotes.has(item.id) ? state.openNotes.delete(item.id) : state.openNotes.add(item.id);
         render();
+      } else if (act === "fav") {
+        const favorite = !item.favorite;
+        state.items = state.items.map((i) => (i.id === item.id ? { ...i, favorite } : i));
+        render();
+        toast(favorite ? "Aggiunto ai preferiti" : "Tolto dai preferiti");
+        const { error } = await sb.from("items").update({ favorite }).eq("id", item.id);
+        if (error) throw error;
+      } else if (act === "check" || act === "unline") {
+        const lines = listLines(item);
+        const n = +btn.dataset.line;
+        if (act === "check") lines[n].done = !lines[n].done; else lines.splice(n, 1);
+        state.openNotes.add(item.id);
+        if (!lines.length) { toast("Lista vuota: puoi cancellarla con il cestino"); }
+        await saveList(item, lines.length ? lines : [{ done: false, text: "…" }]);
       } else if (act === "copy") {
-        await navigator.clipboard.writeText(item.content || "");
+        await navigator.clipboard.writeText(plainText(item));
         toast("Copiato");
       } else if (act === "edit") {
         state.editing = item.id;
@@ -648,6 +735,7 @@
   }
   $("list").addEventListener("click", onItemClick);
   $("recent").addEventListener("click", onItemClick);
+  $("favs").addEventListener("click", onItemClick);
 
   // ---------- Ricerca e vista ----------
   $("search").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); render(); });
@@ -664,6 +752,7 @@
     media: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 8"/></svg>',
     doc: '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>',
     folder: ICONS.folder,
+    clip: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
   };
   document.querySelectorAll("[data-ico]").forEach((el) => (el.innerHTML = FILTER_ICONS[el.dataset.ico]));
@@ -721,6 +810,39 @@
     toast("Cartella eliminata");
   });
 
+  // ---------- Appunti condivisi ----------
+  async function loadClip() {
+    const { data } = await sb.from("clipboard").select("*").maybeSingle();
+    state.clip = data || null;
+    renderClip();
+  }
+  function renderClip() {
+    const c = state.clip;
+    const has = !!(c && c.content);
+    $("clip-text").classList.toggle("hidden", !has);
+    $("clip-text").textContent = has ? c.content : "";
+    $("clip-copy").disabled = !has;
+    $("clip-meta").innerHTML = has
+      ? `Mandati ${esc(fromLabel(c.source || "PC"))} · ${esc(fmtDate(c.updated_at))}`
+      : "Copia un testo, tocca <b>Manda</b> e lo ritrovi sull'altro dispositivo.";
+  }
+  $("clip-send").addEventListener("click", async () => {
+    let text = "";
+    try { text = await navigator.clipboard.readText(); } catch (e) {}
+    if (!text) text = prompt("Incolla qui il testo da mandare all'altro dispositivo:") || "";
+    if (!text.trim()) return;
+    const row = { user_id: state.user.id, content: text.slice(0, 20000), source: DEVICE, updated_at: new Date().toISOString() };
+    state.clip = row; renderClip();
+    const { error } = await sb.from("clipboard").upsert(row);
+    if (error) return toast(translateError(error));
+    toast(IS_MOBILE ? "Mandato: sul PC tocca Copia" : "Mandato: sull'iPhone tocca Copia");
+  });
+  $("clip-copy").addEventListener("click", async () => {
+    if (!state.clip) return;
+    try { await navigator.clipboard.writeText(state.clip.content); toast("Copiato: ora puoi incollarlo dove vuoi"); }
+    catch (e) { toast("Non riesco a copiare, tieni premuto sul testo per copiarlo"); }
+  });
+
   // ---------- Pulsante "+" (telefono) e "Aggiungi" (PC) ----------
   // Nelle sezioni va dritto al punto: Note apre la nota, Foto apre la galleria, Cartelle crea una cartella.
   function pickFiles(kind) {
@@ -728,10 +850,11 @@
     inp.accept = kind === "media" ? "image/*,video/*" : "";
     inp.click();
   }
-  function openNote() {
+  function openNote(opts) {
     const cur = state.folders.find((f) => f.id === state.folder);
     $("note-dlg-title").textContent = cur ? "Nota in " + cur.name : "Nuova nota";
     $("note-save").disabled = !noteInput.value.trim();
+    setNoteMode(opts && opts.list ? "list" : "text");
     $("note-dlg").showModal();
     setTimeout(() => noteInput.focus(), 60);
   }
