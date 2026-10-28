@@ -85,33 +85,33 @@
 
     <div class="shell">
       <aside class="side">
-        <section class="composer glass">
-          <textarea id="note-input" rows="2" placeholder="Scrivi una nota…"></textarea>
-          <div class="composer-actions">
-            <label class="btn soft" for="file-input">
-              <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-              <span>Carica file</span>
-            </label>
-            <input id="file-input" type="file" multiple hidden>
-            <button id="note-save" class="btn primary" disabled>Salva nota</button>
-          </div>
+        <div class="side-add">
+          <button id="add-btn" class="btn primary big" type="button">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi</span>
+          </button>
           <div class="drop-hint">oppure trascina qui i file</div>
-        </section>
+        </div>
+        <input id="file-input" type="file" multiple hidden>
 
         <div id="uploads" class="uploads"></div>
 
         <nav class="side-nav tabs" role="tablist" aria-label="Tipo">
-          <button class="tab active" data-filter="all"><span class="ti" data-ico="all"></span><span class="tl">Tutto</span><span class="tc" data-count="all"></span></button>
-          <button class="tab" data-filter="note"><span class="ti" data-ico="note"></span><span class="tl">Note</span><span class="tc" data-count="note"></span></button>
-          <button class="tab" data-filter="media"><span class="ti" data-ico="media"></span><span class="tl">Foto e video</span><span class="tc" data-count="media"></span></button>
-          <button class="tab" data-filter="doc"><span class="ti" data-ico="doc"></span><span class="tl">Documenti</span><span class="tc" data-count="doc"></span></button>
+          <button class="tab" data-go="home"><span class="ti" data-ico="home"></span><span class="tl">Home</span></button>
+          <button class="tab" data-go="list" data-filter="all"><span class="ti" data-ico="all"></span><span class="tl">Tutto</span><span class="tc" data-count="all"></span></button>
+          <button class="tab" data-go="list" data-filter="note"><span class="ti" data-ico="note"></span><span class="tl">Note</span><span class="tc" data-count="note"></span></button>
+          <button class="tab" data-go="list" data-filter="media"><span class="ti" data-ico="media"></span><span class="tl">Foto e video</span><span class="tc" data-count="media"></span></button>
+          <button class="tab" data-go="list" data-filter="doc"><span class="ti" data-ico="doc"></span><span class="tl">Documenti</span><span class="tc" data-count="doc"></span></button>
         </nav>
 
-        <div class="side-label">Cartelle</div>
+        <button class="side-label" data-go="folders" type="button">Cartelle</button>
         <div id="folder-bar" class="folders"></div>
       </aside>
 
       <main class="main">
+        <div id="home-hello" class="home-hello">
+          <h1 id="hello-title">Ciao</h1>
+          <p>Cosa vuoi aprire?</p>
+        </div>
         <div class="main-head">
           <button id="folder-back" class="icon-btn back hidden" aria-label="Torna a tutte"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
           <div class="mh-text">
@@ -132,6 +132,37 @@
           <input id="search" type="search" placeholder="Cerca tra note e file" autocomplete="off">
         </label>
 
+        <section id="home-body" class="home-body">
+          <div class="tiles">
+            <button class="tile" data-go="list" data-filter="note" style="--c:var(--t-note)">
+              <span class="tile-top"><span class="tile-ico" data-ico="note"></span><span class="tile-name">Note</span></span>
+              <span class="tile-n"><b data-tile-count="note">0</b> <small data-tile-unit="note">note</small></span>
+              <span class="tile-prev" id="tile-note"></span>
+            </button>
+            <button class="tile" data-go="list" data-filter="media" style="--c:var(--t-media)">
+              <span class="tile-top"><span class="tile-ico" data-ico="media"></span><span class="tile-name">Foto e video</span></span>
+              <span class="tile-n"><b data-tile-count="media">0</b> <small data-tile-unit="media">file</small></span>
+              <span class="tile-prev" id="tile-media"></span>
+            </button>
+            <button class="tile" data-go="list" data-filter="doc" style="--c:var(--t-doc)">
+              <span class="tile-top"><span class="tile-ico" data-ico="doc"></span><span class="tile-name">Documenti</span></span>
+              <span class="tile-n"><b data-tile-count="doc">0</b> <small data-tile-unit="doc">file</small></span>
+              <span class="tile-prev" id="tile-doc"></span>
+            </button>
+            <button class="tile" data-go="folders" style="--c:var(--t-fold)">
+              <span class="tile-top"><span class="tile-ico" data-ico="folder"></span><span class="tile-name">Cartelle</span></span>
+              <span class="tile-n"><b data-tile-count="folders">0</b> <small data-tile-unit="folders">cartelle</small></span>
+              <span class="tile-prev" id="tile-folders"></span>
+            </button>
+          </div>
+          <div class="recent">
+            <div class="recent-head"><h2>Ultimi arrivati</h2><button class="link-btn" data-go="list" data-filter="all" type="button">Vedi tutto</button></div>
+            <div id="recent" class="list as-list"></div>
+            <div id="recent-empty" class="recent-empty hidden">Qui vedrai le ultime note e gli ultimi file, da qualsiasi dispositivo. Tocca <b>+</b> per iniziare.</div>
+          </div>
+        </section>
+
+        <div id="folder-grid" class="folder-grid hidden"></div>
         <section id="list" class="list"></section>
         <div id="empty" class="empty hidden">
           <div class="empty-art">✨</div>
@@ -141,6 +172,36 @@
       </main>
     </div>
   </div>
+
+  <button id="fab" class="fab" type="button" aria-label="Aggiungi"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+
+  <!-- Cosa vuoi aggiungere? -->
+  <dialog id="add-sheet" class="sheet">
+    <div class="sheet-card">
+      <div class="sheet-grip"></div>
+      <h2>Aggiungi</h2>
+      <p id="add-where" class="muted sheet-where"></p>
+      <div class="sheet-opts">
+        <button class="sheet-opt" data-add="note" type="button" style="--c:var(--t-note)"><span class="so-ico" data-ico="note"></span><span><b>Scrivi una nota</b><small>Testo, liste, promemoria</small></span></button>
+        <button class="sheet-opt" data-add="media" type="button" style="--c:var(--t-media)"><span class="so-ico" data-ico="media"></span><span><b>Foto o video</b><small>Dalla galleria o dalla fotocamera</small></span></button>
+        <button class="sheet-opt" data-add="doc" type="button" style="--c:var(--t-doc)"><span class="so-ico" data-ico="doc"></span><span><b>Documento</b><small>Word, Excel, PDF e altri file</small></span></button>
+        <button class="sheet-opt" data-add="folder" type="button" style="--c:var(--t-fold)"><span class="so-ico" data-ico="folder"></span><span><b>Nuova cartella</b><small>Per tenere tutto in ordine</small></span></button>
+      </div>
+      <button id="add-cancel" class="link" type="button">Annulla</button>
+    </div>
+  </dialog>
+
+  <!-- Nuova nota -->
+  <dialog id="note-dlg" class="sheet">
+    <div class="sheet-card note-card">
+      <div class="note-card-head">
+        <button id="note-cancel" class="btn soft small" type="button">Annulla</button>
+        <h2 id="note-dlg-title">Nuova nota</h2>
+        <button id="note-save" class="btn primary small" type="button" disabled>Salva</button>
+      </div>
+      <textarea id="note-input" rows="7" placeholder="Scrivi una nota…"></textarea>
+    </div>
+  </dialog>
 
   <!-- Blocco con Face ID -->
   <div id="lock" class="lock hidden">

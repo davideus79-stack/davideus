@@ -19,7 +19,7 @@
   // Sul telefono si parte con l'elenco (più ordinato), sul PC con le schede
   let savedView = /iPhone|iPad|Android/.test(navigator.userAgent) ? "list" : "grid";
   try { savedView = localStorage.getItem("myhome-view") || savedView; } catch (e) {}
-  const state = { view: savedView, q: "", openNotes: new Set(), folders: [], folder: null, blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
+  const state = { screen: "home", view: savedView, q: "", openNotes: new Set(), folders: [], folder: null, blobs: new Map(), user: null, items: [], filter: "all", channel: null, urls: new Map(), editing: null, signup: false };
 
   // ---------- Utilità ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -200,6 +200,7 @@
     state.items = [];
     state.folders = [];
     state.folder = null;
+    state.screen = "home";
     state.urls.clear();
     $("app").classList.add("hidden");
     $("auth").classList.remove("hidden");
@@ -211,6 +212,10 @@
   async function showApp() {
     $("auth").classList.add("hidden");
     $("app").classList.remove("hidden");
+    // Si parte sempre dalla schermata iniziale
+    state.screen = "home"; state.folder = null; state.filter = "all";
+    try { history.replaceState({ screen: "home" }, ""); } catch (e) {}
+    render();
     $("menu-user").textContent = state.user.email;
     const t = state.user.user_metadata && state.user.user_metadata.theme;
     if (t) applyTheme(t);
@@ -267,7 +272,7 @@
         } else if (p.eventType === "DELETE") {
           state.folders = state.folders.filter((f) => f.id !== p.old.id);
           state.items = state.items.map((i) => (i.folder_id === p.old.id ? { ...i, folder_id: null } : i));
-          if (state.folder === p.old.id) state.folder = null;
+          if (state.folder === p.old.id) { sortFolders(); return go("folders", {}, "replace"); }
         }
         sortFolders();
         render();
@@ -288,11 +293,7 @@
 
   // ---------- Note ----------
   const noteInput = $("note-input");
-  noteInput.addEventListener("input", () => {
-    $("note-save").disabled = !noteInput.value.trim();
-    noteInput.style.height = "auto";
-    noteInput.style.height = Math.min(noteInput.scrollHeight, 320) + "px";
-  });
+  noteInput.addEventListener("input", () => { $("note-save").disabled = !noteInput.value.trim(); });
   noteInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
   });
@@ -305,7 +306,7 @@
     const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder }).select().single();
     if (error) { toast(translateError(error)); $("note-save").disabled = false; return; }
     noteInput.value = "";
-    noteInput.style.height = "auto";
+    $("note-dlg").close();
     if (!state.items.some((i) => i.id === data.id)) state.items.unshift(data);
     render(data.id);
     toast("Nota salvata");
@@ -376,14 +377,38 @@
   });
 
   // ---------- Elenco ----------
-  document.querySelectorAll(".tab").forEach((t) =>
-    t.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-      t.classList.add("active");
-      state.filter = t.dataset.filter;
-      render();
-    })
-  );
+  // ---------- Navigazione: Home -> sezione -> cartella ----------
+  // Ogni passaggio entra nella cronologia, così "indietro" (anche il gesto sull'iPhone) torna dov'eri.
+  function go(screen, opts = {}, how = "push") {
+    state.screen = screen;
+    state.folder = screen === "list" ? opts.folder || null : null;
+    state.filter = screen === "list" && !state.folder ? opts.filter || "all" : "all";
+    state.q = ""; $("search").value = "";
+    state.openNotes.clear(); state.editing = null;
+    const st = { screen, filter: state.filter, folder: state.folder };
+    try { if (how === "push") history.pushState(st, ""); else if (how === "replace") history.replaceState(st, ""); } catch (e) {}
+    render();
+    window.scrollTo({ top: 0 });
+  }
+  window.addEventListener("popstate", (e) => {
+    if (!state.user) return;
+    const st = e.state || { screen: "home" };
+    if (st.folder && !state.folders.some((f) => f.id === st.folder)) return go("folders", {}, "replace");
+    go(st.screen || "home", st, "none");
+  });
+  function goBack() {
+    if (history.state && history.state.screen && history.state.screen !== "home" && history.length > 1) history.back();
+    else go(state.folder ? "folders" : "home", {}, "replace");
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-go]");
+    if (!b || !state.user) return;
+    const screen = b.dataset.go;
+    const same = screen === state.screen && (b.dataset.filter || "all") === state.filter && !state.folder;
+    if (same) return;
+    // dalla barra laterale del PC si cambia sezione senza allungare la cronologia
+    go(screen, { filter: b.dataset.filter }, state.screen === "home" ? "push" : "replace");
+  });
 
   const FILTER_LABELS = { all: "Tutto", note: "Note", media: "Foto e video", doc: "Documenti" };
   const matchesQ = (i) => {
@@ -394,11 +419,35 @@
 
   function render(freshId) {
     renderFolders();
+    const home = state.screen === "home" && !state.q;
+    const folders = state.screen === "folders";
     const inFolder = !!state.folder;
+    const app = $("app");
+    app.dataset.screen = home ? "home" : folders ? "folders" : "list";
+    document.querySelectorAll(".side-nav [data-go]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.go === "home" ? state.screen === "home" : state.screen === "list" && !inFolder && b.dataset.filter === state.filter));
+    document.querySelector(".side-label").classList.toggle("on", folders);
+    $("home-hello").classList.toggle("hidden", state.screen !== "home");
+    $("home-body").classList.toggle("hidden", !home);
+    $("folder-grid").classList.toggle("hidden", !folders);
+    $("search").placeholder = inFolder ? "Cerca in questa cartella" : "Cerca tra note e file";
+    $("search").closest(".search").classList.toggle("hidden", folders);
+    $("folder-back").classList.toggle("hidden", state.screen === "home");
+    if (home) { renderHome(freshId); $("list").innerHTML = ""; $("list").className = "list hidden"; $("empty").classList.add("hidden"); $("view-toggle").classList.add("hidden"); return; }
+    $("recent").innerHTML = "";
+    if (folders) {
+      $("list").innerHTML = ""; $("list").className = "list hidden"; $("empty").classList.add("hidden");
+      $("view-toggle").classList.add("hidden");
+      $("main-title").textContent = "Cartelle";
+      $("main-sub").textContent = state.folders.length === 1 ? "1 cartella" : state.folders.length + " cartelle";
+      return;
+    }
+
     const scope = state.items.filter((i) => (!inFolder || i.folder_id === state.folder) && matchesQ(i));
     // numeri accanto a Tutto / Note / Foto / Documenti
-    const counts = { all: scope.length, note: 0, media: 0, doc: 0 };
-    scope.forEach((i) => counts[category(i)]++);
+    const all = state.items;
+    const counts = { all: all.length, note: 0, media: 0, doc: 0 };
+    all.forEach((i) => counts[category(i)]++);
     document.querySelectorAll("[data-count]").forEach((el) => (el.textContent = counts[el.dataset.count] || ""));
     const items = scope.filter((i) => state.filter === "all" || category(i) === state.filter);
 
@@ -410,15 +459,71 @@
     $("view-toggle").classList.toggle("hidden", inFolder);
 
     const cur = state.folders.find((f) => f.id === state.folder);
-    $("main-title").textContent = cur ? cur.name : state.q ? "Risultati" : FILTER_LABELS[state.filter];
+    $("main-title").textContent = cur ? cur.name : state.q && state.screen === "home" ? "Risultati" : FILTER_LABELS[state.filter];
     $("main-sub").textContent = countLabel(items.length) + (cur && state.filter !== "all" ? " · " + FILTER_LABELS[state.filter] : "");
 
     $("empty").classList.toggle("hidden", items.length > 0);
-    $("empty-title").textContent = state.q ? "Nessun risultato." : cur ? "Cartella vuota." : "Ancora niente qui.";
+    $("empty-title").textContent = state.q ? "Nessun risultato." : cur ? "Cartella vuota." : EMPTY_TITLES[state.filter];
     $("empty-text").textContent = state.q ? "Prova con un'altra parola."
-      : cur ? "Quello che scrivi o carichi mentre sei qui finisce in questa cartella. Puoi anche spostarci le cose con il tasto cartella."
-      : "Scrivi una nota o carica un file: comparirà subito su tutti i tuoi dispositivi.";
+      : cur ? `Tocca ${ADD_WORD} per aggiungere qui una nota o un file. Puoi anche spostarci le cose con il tasto cartella.`
+      : `Tocca ${ADD_WORD} per aggiungerne: compariranno subito su tutti i tuoi dispositivi.`;
     list.innerHTML = items.map((i) => (view === "list" ? rowHtml(i, i.id === freshId) : cardHtml(i, i.id === freshId))).join("");
+  }
+  const EMPTY_TITLES = { all: "Ancora niente qui.", note: "Nessuna nota.", media: "Nessuna foto o video.", doc: "Nessun documento." };
+  const ADD_WORD = IS_MOBILE ? "+" : "Aggiungi";
+
+  // ---------- Schermata iniziale: quattro riquadri e gli ultimi arrivati ----------
+  function greeting() {
+    const h = new Date().getHours();
+    return h >= 5 && h < 13 ? "Buongiorno" : h >= 13 && h < 18 ? "Buon pomeriggio" : "Buonasera";
+  }
+  const plural = (n, one, many) => (n === 1 ? one : many);
+  function renderHome(freshId) {
+    $("hello-title").textContent = greeting();
+    const by = { note: [], media: [], doc: [] };
+    state.items.forEach((i) => by[category(i)].push(i));
+    const setCount = (k, n, one, many) => {
+      document.querySelector(`[data-tile-count="${k}"]`).textContent = n;
+      document.querySelector(`[data-tile-unit="${k}"]`).textContent = plural(n, one, many);
+    };
+    setCount("note", by.note.length, "nota", "note");
+    setCount("media", by.media.length, "file", "file");
+    setCount("doc", by.doc.length, "file", "file");
+    setCount("folders", state.folders.length, "cartella", "cartelle");
+
+    // Note: l'inizio dell'ultima nota
+    const n = by.note[0];
+    $("tile-note").innerHTML = n
+      ? `<span class="tp-note">${esc((n.content || "").slice(0, 140))}</span>`
+      : `<span class="tp-hint">Scrivi la prima nota</span>`;
+
+    // Foto e video: mosaico delle ultime quattro
+    const m = by.media.slice(0, 4);
+    $("tile-media").innerHTML = m.length
+      ? `<span class="tp-mosaic n${m.length}">${m.map((i) => {
+          const url = state.urls.get(i.file_path)?.url;
+          const img = (i.mime_type || "").startsWith("image/") && url;
+          return `<span class="tp-th${img ? "" : " vid"}">${img ? `<img src="${esc(url)}" alt="" loading="lazy">` : ICONS.play}</span>`;
+        }).join("")}</span>`
+      : `<span class="tp-hint">Carica foto e video</span>`;
+
+    // Documenti: gli ultimi due, con il tipo
+    const d = by.doc.slice(0, 2);
+    $("tile-doc").innerHTML = d.length
+      ? d.map((i) => `<span class="tp-doc"><i>${esc(fileStyle(i).label)}</i><em>${esc(i.file_name)}</em></span>`).join("")
+      : `<span class="tp-hint">Word, Excel, PDF…</span>`;
+
+    // Cartelle: le prime tre
+    const f = state.folders.slice(0, 3);
+    $("tile-folders").innerHTML = f.length
+      ? f.map((x) => `<span class="tp-chip"><i style="background:${x.color || "#fff"}"></i><em>${esc(x.name)}</em></span>`).join("")
+        + (state.folders.length > 3 ? `<span class="tp-chip more">+${state.folders.length - 3}</span>` : "")
+      : `<span class="tp-hint">Crea la prima cartella</span>`;
+
+    const recent = state.items.slice(0, IS_MOBILE ? 5 : 8);
+    $("recent").innerHTML = recent.map((i) => rowHtml(i, i.id === freshId)).join("");
+    $("recent").classList.toggle("hidden", !recent.length);
+    $("recent-empty").classList.toggle("hidden", recent.length > 0);
   }
 
   // Riga semplice (vista elenco e dentro le cartelle): icona, nome, dettagli, azioni
@@ -511,7 +616,7 @@
     </article>`;
   }
 
-  $("list").addEventListener("click", async (e) => {
+  async function onItemClick(e) {
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
     const card = btn.closest(".card, .row");
@@ -528,7 +633,7 @@
       } else if (act === "edit") {
         state.editing = item.id;
         render();
-        const p = document.querySelector(`.card[data-id="${item.id}"] .note-text`);
+        const p = card.parentElement.querySelector(`[data-id="${item.id}"] .note-text`);
         p.focus();
         document.getSelection().selectAllChildren(p);
         document.getSelection().collapseToEnd();
@@ -563,7 +668,9 @@
     } catch (err) {
       toast(translateError(err));
     }
-  });
+  }
+  $("list").addEventListener("click", onItemClick);
+  $("recent").addEventListener("click", onItemClick);
 
   // ---------- Ricerca e vista ----------
   $("search").addEventListener("input", (e) => { state.q = e.target.value.trim().toLowerCase(); render(); });
@@ -579,6 +686,8 @@
     note: ICONS.note,
     media: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 8"/></svg>',
     doc: '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>',
+    folder: ICONS.folder,
+    home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
   };
   document.querySelectorAll("[data-ico]").forEach((el) => (el.innerHTML = FILTER_ICONS[el.dataset.ico]));
 
@@ -590,7 +699,6 @@
     const cur = state.folders.find((f) => f.id === state.folder);
     $("note-input").placeholder = cur ? `Scrivi una nota in "${cur.name}"…` : "Scrivi una nota…";
     $("app").classList.toggle("in-folder", !!cur);
-    $("folder-back").classList.toggle("hidden", !cur);
     $("folder-rename").classList.toggle("hidden", !cur);
     $("folder-delete").classList.toggle("hidden", !cur);
     document.querySelector(".main-head").style.setProperty("--fc", cur ? cur.color || "#6366f1" : "transparent");
@@ -599,20 +707,30 @@
       return `<button class="folder-chip${f.id === state.folder ? " on" : ""}" data-folder="${f.id}" style="--fc:${f.color || "#6366f1"}">
         <span class="fico">${ICONS.folder}</span><span class="fname">${esc(f.name)}</span><span class="fnum">${n}</span></button>`;
     }).join("") + `<button class="folder-chip add" data-folder-new="1"><span class="fico">${ICONS.plus}</span><span class="fname">Nuova cartella</span></button>`;
+    if (state.screen !== "folders") { $("folder-grid").innerHTML = ""; return; }
+    // Sezione Cartelle: riquadri grandi con l'elenco di cosa c'è dentro
+    $("folder-grid").innerHTML = state.folders.map((f) => {
+      const inside = state.items.filter((i) => i.folder_id === f.id);
+      const last = inside.slice(0, 2).map((i) => esc(i.kind === "note" ? (i.content || "").split("\n")[0].slice(0, 40) : i.file_name)).join(" · ");
+      return `<button class="folder-card" data-folder="${f.id}" style="--fc:${f.color || "#6366f1"}">
+        <span class="fc-ico">${ICONS.folder}</span>
+        <span class="fc-name">${esc(f.name)}</span>
+        <span class="fc-num">${countLabel(inside.length)}</span>
+        <span class="fc-last">${last || "Vuota"}</span></button>`;
+    }).join("") + `<button class="folder-card add" data-folder-new="1"><span class="fc-ico">${ICONS.plus}</span><span class="fc-name">Nuova cartella</span><span class="fc-num">Tocca per crearla</span></button>`;
   }
   const countLabel = (n) => (n === 1 ? "1 elemento" : n + " elementi");
 
-  $("folder-bar").addEventListener("click", (e) => {
+  function onFolderClick(e) {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.folderNew) return openFolderName(null);
-    state.folder = state.folder === b.dataset.folder ? null : b.dataset.folder;
-    state.filter = "all";
-    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.dataset.filter === "all"));
-    render();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
-  $("folder-back").addEventListener("click", () => { state.folder = null; render(); });
+    if (b.dataset.folder === state.folder) return;
+    go("list", { folder: b.dataset.folder }, state.screen === "list" && state.folder ? "replace" : "push");
+  }
+  $("folder-bar").addEventListener("click", onFolderClick);
+  $("folder-grid").addEventListener("click", onFolderClick);
+  $("folder-back").addEventListener("click", goBack);
   $("folder-rename").addEventListener("click", () => openFolderName(state.folders.find((f) => f.id === state.folder)));
   $("folder-delete").addEventListener("click", async () => {
     const f = state.folders.find((x) => x.id === state.folder);
@@ -622,10 +740,48 @@
     if (error) return toast(translateError(error));
     state.folders = state.folders.filter((x) => x.id !== f.id);
     state.items = state.items.map((i) => (i.folder_id === f.id ? { ...i, folder_id: null } : i));
-    state.folder = null;
-    render();
+    go("folders", {}, "replace");
     toast("Cartella eliminata");
   });
+
+  // ---------- Pulsante "+" (telefono) e "Aggiungi" (PC) ----------
+  // Nelle sezioni va dritto al punto: Note apre la nota, Foto apre la galleria, Cartelle crea una cartella.
+  function pickFiles(kind) {
+    const inp = $("file-input");
+    inp.accept = kind === "media" ? "image/*,video/*" : "";
+    inp.click();
+  }
+  function openNote() {
+    const cur = state.folders.find((f) => f.id === state.folder);
+    $("note-dlg-title").textContent = cur ? "Nota in " + cur.name : "Nuova nota";
+    $("note-save").disabled = !noteInput.value.trim();
+    $("note-dlg").showModal();
+    setTimeout(() => noteInput.focus(), 60);
+  }
+  function onAdd() {
+    if (state.screen === "folders") return openFolderName(null);
+    if (state.screen === "list" && !state.folder && !state.q) {
+      if (state.filter === "note") return openNote();
+      if (state.filter === "media" || state.filter === "doc") return pickFiles(state.filter);
+    }
+    const cur = state.folders.find((f) => f.id === state.folder);
+    $("add-where").textContent = cur ? `Finirà nella cartella "${cur.name}"` : "Comparirà subito su tutti i tuoi dispositivi";
+    document.querySelector('.sheet-opt[data-add="folder"]').classList.toggle("hidden", !!cur);
+    $("add-sheet").showModal();
+  }
+  $("fab").addEventListener("click", onAdd);
+  $("add-btn").addEventListener("click", onAdd);
+  $("add-cancel").addEventListener("click", () => $("add-sheet").close());
+  document.querySelectorAll(".sheet-opt").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.add;
+    $("add-sheet").close();
+    if (k === "note") openNote();
+    else if (k === "folder") openFolderName(null);
+    else pickFiles(k); // nello stesso tocco, altrimenti l'iPhone non apre la galleria
+  }));
+  $("note-cancel").addEventListener("click", () => $("note-dlg").close());
+  // Tocco fuori dalla finestra = chiudi
+  ["add-sheet", "note-dlg"].forEach((id) => $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).close(); }));
 
   // Finestra per creare o rinominare una cartella
   let editingFolder = null;
@@ -659,8 +815,11 @@
       const { data, error } = await sb.from("folders").insert({ name, color }).select().single();
       if (error) return toast(translateError(error));
       if (!state.folders.some((f) => f.id === data.id)) state.folders.push(data);
-      state.folder = data.id; // entra subito nella cartella nuova
-      if (state.moving) { await moveTo(state.moving, data.id); state.moving = null; }
+      sortFolders();
+      $("fn-dlg").close();
+      if (state.moving) { await moveTo(state.moving, data.id); state.moving = null; return; }
+      go("list", { folder: data.id }); // entra subito nella cartella nuova
+      return;
     }
     sortFolders();
     $("fn-dlg").close();
