@@ -274,7 +274,7 @@
         if (!p.new || p.new.user_id !== state.user.id) return;
         const changed = !state.clip || state.clip.content !== p.new.content;
         state.clip = p.new; renderClip();
-        if (changed && p.new.source && p.new.source !== DEVICE) toast(`Appunti arrivati ${fromLabel(p.new.source)}: tocca Copia`);
+        if (changed && p.new.content && !clipMine(p.new)) toast(`Appunti arrivati ${fromLabel(p.new.source)}: tocca Copia`);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "folders" }, (p) => {
         if (p.eventType === "INSERT") {
@@ -964,31 +964,48 @@
     state.clip = data || null;
     renderClip();
   }
+  // Ogni dispositivo ha un suo codice, così sa se gli appunti li ha mandati lui o l'altro
+  let DEVICE_ID = "";
+  try { DEVICE_ID = localStorage.getItem("myhome-devid") || ""; if (!DEVICE_ID) { DEVICE_ID = crypto.randomUUID(); localStorage.setItem("myhome-devid", DEVICE_ID); } } catch (e) { DEVICE_ID = crypto.randomUUID(); }
+  const clipMine = (c) => c && (c.device_id ? c.device_id === DEVICE_ID : c.source === DEVICE);
+  let clipSentAt = 0;
   function renderClip() {
     const c = state.clip;
-    const has = !!(c && c.content);
-    $("clip-text").classList.toggle("hidden", !has);
-    $("clip-text").textContent = has ? c.content : "";
-    $("clip-copy").disabled = !has;
-    $("clip-meta").innerHTML = has
-      ? `Mandati ${esc(fromLabel(c.source || "PC"))} · ${esc(fmtDate(c.updated_at))}`
-      : "Copia un testo, tocca <b>Manda</b> e lo ritrovi sull'altro dispositivo.";
+    // il testo si vede solo sull'altro dispositivo; chi lo manda vede il riquadro vuoto
+    const incoming = !!(c && c.content && !clipMine(c));
+    const waiting = !!(c && c.content && clipMine(c));
+    $("clip-text").classList.toggle("hidden", !incoming);
+    $("clip-text").textContent = incoming ? c.content : "";
+    $("clip-copy").disabled = !incoming;
+    $("clip").classList.toggle("incoming", incoming);
+    $("clip-meta").innerHTML = incoming
+      ? `Arrivati ${esc(fromLabel(c.source || "PC"))} · ${esc(fmtDate(c.updated_at))}`
+      : waiting && Date.now() - clipSentAt < 8000
+        ? "Mandati ✓ Sull'altro dispositivo tocca <b>Copia</b>."
+        : "Copia un testo, tocca <b>Manda</b> e lo ritrovi sull'altro dispositivo.";
+    if (waiting && clipSentAt) { clearTimeout(renderClip._t); renderClip._t = setTimeout(renderClip, 8200); }
   }
   $("clip-send").addEventListener("click", async () => {
     let text = "";
     try { text = await navigator.clipboard.readText(); } catch (e) {}
     if (!text) text = prompt("Incolla qui il testo da mandare all'altro dispositivo:") || "";
     if (!text.trim()) return;
-    const row = { user_id: state.user.id, content: text.slice(0, 20000), source: DEVICE, updated_at: new Date().toISOString() };
+    const row = { user_id: state.user.id, content: text.slice(0, 20000), source: DEVICE, device_id: DEVICE_ID, updated_at: new Date().toISOString() };
+    clipSentAt = Date.now();
     state.clip = row; renderClip();
     const { error } = await sb.from("clipboard").upsert(row);
     if (error) return toast(translateError(error));
     toast(IS_MOBILE ? "Mandato: sul PC tocca Copia" : "Mandato: sull'iPhone tocca Copia");
   });
   $("clip-copy").addEventListener("click", async () => {
-    if (!state.clip) return;
-    try { await navigator.clipboard.writeText(state.clip.content); toast("Copiato: ora puoi incollarlo dove vuoi"); }
-    catch (e) { toast("Non riesco a copiare, tieni premuto sul testo per copiarlo"); }
+    if (!state.clip || !state.clip.content) return;
+    try { await navigator.clipboard.writeText(state.clip.content); }
+    catch (e) { toast("Non riesco a copiare, tieni premuto sul testo per copiarlo"); return; }
+    toast("Copiato: ora puoi incollarlo dove vuoi");
+    // copiato: il testo sparisce da tutti e due i dispositivi
+    state.clip = { ...state.clip, content: "" }; renderClip();
+    const { error } = await sb.from("clipboard").update({ content: "", updated_at: new Date().toISOString() }).eq("user_id", state.user.id);
+    if (error) toast(translateError(error));
   });
 
   // ---------- Pulsante "+" (telefono) e "Aggiungi" (PC) ----------

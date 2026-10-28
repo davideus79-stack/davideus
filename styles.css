@@ -834,3 +834,4 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
 #note-dlg.is-remind .note-mode { display: none; }
 #note-dlg.is-remind #note-input { min-height: 22vh; }
 .sheet-opt:last-child:nth-child(odd) { grid-template-columns: auto 1fr; align-items: center; gap: 14px; }
+.clip.incoming { box-shadow: 0 0 0 2px var(--primary), var(--shadow); }
