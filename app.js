@@ -491,34 +491,7 @@
     setCount("doc", by.doc.length, "file", "file");
     setCount("folders", state.folders.length, "cartella", "cartelle");
 
-    // Note: l'inizio dell'ultima nota
-    const n = by.note[0];
-    $("tile-note").innerHTML = n
-      ? `<span class="tp-note">${esc((n.content || "").slice(0, 140))}</span>`
-      : `<span class="tp-hint">Scrivi la prima nota</span>`;
-
-    // Foto e video: mosaico delle ultime quattro
-    const m = by.media.slice(0, 4);
-    $("tile-media").innerHTML = m.length
-      ? `<span class="tp-mosaic n${m.length}">${m.map((i) => {
-          const url = state.urls.get(i.file_path)?.url;
-          const img = (i.mime_type || "").startsWith("image/") && url;
-          return `<span class="tp-th${img ? "" : " vid"}">${img ? `<img src="${esc(url)}" alt="" loading="lazy">` : ICONS.play}</span>`;
-        }).join("")}</span>`
-      : `<span class="tp-hint">Carica foto e video</span>`;
-
-    // Documenti: gli ultimi due, con il tipo
-    const d = by.doc.slice(0, 2);
-    $("tile-doc").innerHTML = d.length
-      ? d.map((i) => `<span class="tp-doc"><i>${esc(fileStyle(i).label)}</i><em>${esc(i.file_name)}</em></span>`).join("")
-      : `<span class="tp-hint">Word, Excel, PDF…</span>`;
-
-    // Cartelle: le prime tre
-    const f = state.folders.slice(0, 3);
-    $("tile-folders").innerHTML = f.length
-      ? f.map((x) => `<span class="tp-chip"><i style="background:${x.color || "#fff"}"></i><em>${esc(x.name)}</em></span>`).join("")
-        + (state.folders.length > 3 ? `<span class="tp-chip more">+${state.folders.length - 3}</span>` : "")
-      : `<span class="tp-hint">Crea la prima cartella</span>`;
+    // Nei riquadri niente anteprime: solo icona, nome e numero (Davide preferisce così)
 
     const recent = state.items.slice(0, IS_MOBILE ? 5 : 8);
     $("recent").innerHTML = recent.map((i) => rowHtml(i, i.id === freshId)).join("");

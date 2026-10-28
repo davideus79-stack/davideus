@@ -719,3 +719,12 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
   [data-theme="vivace"] .bg-blobs span:nth-child(1) { height: 250px;
     clip-path: path("M0 0 H3000 V190 C 2600 250, 2200 140, 1800 190 S 1000 250, 600 190 S 100 175, 0 215 Z"); }
 }
+/* Riquadri senza anteprime: icona grande, nome, numero in basso */
+.tile { min-height: 150px; justify-content: space-between; }
+.tile-top { flex-direction: column; align-items: flex-start; gap: 12px; }
+.tile-ico { width: 46px; height: 46px; border-radius: 15px; }
+.tile-ico svg { width: 24px; height: 24px; }
+.tile-name { font-size: 16px; }
+.tile-n { margin-top: auto; }
+@media (min-width: 900px) { .tile { min-height: 180px; } }
+@media (min-width: 900px) and (max-width: 1150px) { .tile { min-height: 160px; } }
