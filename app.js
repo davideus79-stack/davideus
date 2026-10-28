@@ -981,15 +981,16 @@
     $("clip-meta").innerHTML = incoming
       ? `Arrivati ${esc(fromLabel(c.source || "PC"))} · ${esc(fmtDate(c.updated_at))}`
       : waiting && Date.now() - clipSentAt < 8000
-        ? "Mandati ✓ Sull'altro dispositivo tocca <b>Copia</b>."
-        : "Copia un testo, tocca <b>Manda</b> e lo ritrovi sull'altro dispositivo.";
+        ? "Mandati ✓ Sull'altro dispositivo tocca <b>Copia</b>. Puoi mandarne subito un altro."
+        : "Scrivi o incolla un testo e tocca <b>Manda</b>: lo ritrovi sull'altro dispositivo.";
     if (waiting && clipSentAt) { clearTimeout(renderClip._t); renderClip._t = setTimeout(renderClip, 8200); }
   }
   $("clip-send").addEventListener("click", async () => {
-    let text = "";
-    try { text = await navigator.clipboard.readText(); } catch (e) {}
-    if (!text) text = prompt("Incolla qui il testo da mandare all'altro dispositivo:") || "";
-    if (!text.trim()) return;
+    // prima il testo scritto nella casella; se è vuota, quello copiato sul dispositivo
+    let text = $("clip-input").value.trim();
+    if (!text) { try { text = await navigator.clipboard.readText(); } catch (e) {} }
+    if (!text || !text.trim()) { toast("Scrivi o incolla un testo nella casella, poi tocca Manda"); $("clip-input").focus(); return; }
+    $("clip-input").value = ""; $("clip-input").style.height = "";
     const row = { user_id: state.user.id, content: text.slice(0, 20000), source: DEVICE, device_id: DEVICE_ID, updated_at: new Date().toISOString() };
     clipSentAt = Date.now();
     state.clip = row; renderClip();
@@ -997,6 +998,7 @@
     if (error) return toast(translateError(error));
     toast(IS_MOBILE ? "Mandato: sul PC tocca Copia" : "Mandato: sull'iPhone tocca Copia");
   });
+  $("clip-input").addEventListener("input", (e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; });
   $("clip-copy").addEventListener("click", async () => {
     if (!state.clip || !state.clip.content) return;
     try { await navigator.clipboard.writeText(state.clip.content); }

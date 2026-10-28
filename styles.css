@@ -835,3 +835,6 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
 #note-dlg.is-remind #note-input { min-height: 22vh; }
 .sheet-opt:last-child:nth-child(odd) { grid-template-columns: auto 1fr; align-items: center; gap: 14px; }
 .clip.incoming { box-shadow: 0 0 0 2px var(--primary), var(--shadow); }
+.clip-input { width: 100%; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; line-height: 1.4; outline: none; min-height: 44px; }
+.clip-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--soft); }
+@media (min-width: 900px) { .clip-input { grid-column: 1 / -1; } .clip-actions { grid-column: 1 / -1; justify-content: flex-end; } .clip { grid-template-columns: 1fr; } }
