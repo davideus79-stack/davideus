@@ -819,3 +819,18 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
 .sheet-card { grid-template-columns: minmax(0, 1fr); }
 .note-remind input { width: 0; }
 .note-mode button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Voce Promemoria nel "+" */
+:root { --t-remind: #f43f5e; }
+[data-theme="vivace"] { --t-remind: #ef4444; }
+[data-theme="notte"] { --t-remind: #db2777; }
+[data-theme="carta"] { --t-remind: #a0522d; }
+[data-theme="tramonto"] { --t-remind: #e11d48; }
+[data-theme="oceano"] { --t-remind: #f43f5e; }
+[data-theme="pastello"] { --t-remind: #ffb3b3; }
+[data-theme="pop"] { --t-remind: #ff9f43; }
+[data-theme="oro"] { --t-remind: #1f1c16; }
+.sheet-opt:last-child:nth-child(odd) { grid-column: 1 / -1; }
+#note-dlg.is-remind .note-remind { background: color-mix(in srgb, var(--t-remind) 16%, var(--card)); }
+#note-dlg.is-remind .note-mode { display: none; }
+#note-dlg.is-remind #note-input { min-height: 22vh; }
+.sheet-opt:last-child:nth-child(odd) { grid-template-columns: auto 1fr; align-items: center; gap: 14px; }

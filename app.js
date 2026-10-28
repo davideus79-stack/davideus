@@ -341,7 +341,7 @@
     $("note-dlg").close();
     if (!state.items.some((i) => i.id === data.id)) state.items.unshift(data);
     render(data.id);
-    toast(state.noteMode === "list" ? "Lista salvata" : "Nota salvata");
+    toast(remind_at ? "Promemoria: " + fmtWhen(remind_at) : state.noteMode === "list" ? "Lista salvata" : "Nota salvata");
   }
 
   // ---------- File ----------
@@ -1000,9 +1000,18 @@
   }
   function openNote(opts) {
     const cur = state.folders.find((f) => f.id === state.folder);
-    $("note-dlg-title").textContent = cur ? "Nota in " + cur.name : "Nuova nota";
+    const rem = opts && opts.remind;
+    $("note-dlg-title").textContent = rem ? "Nuovo promemoria" : cur ? "Nota in " + cur.name : "Nuova nota";
     $("note-save").disabled = !noteInput.value.trim();
     setNoteMode(opts && opts.list ? "list" : "text");
+    if (rem) {
+      noteInput.placeholder = "Di cosa vuoi che ti ricordi?";
+      $("note-remind").value = toLocalInput(new Date(Math.ceil((Date.now() + 3600e3) / 900e3) * 900e3)); // tra circa un'ora
+      $("note-remind-clear").classList.remove("hidden");
+    } else if (!noteInput.value.trim()) {
+      $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden");
+    }
+    $("note-dlg").classList.toggle("is-remind", !!rem);
     $("note-dlg").showModal();
     setTimeout(() => noteInput.focus(), 60);
   }
@@ -1024,6 +1033,7 @@
     const k = b.dataset.add;
     $("add-sheet").close();
     if (k === "note") openNote();
+    else if (k === "remind") openNote({ remind: true });
     else if (k === "folder") openFolderName(null);
     else pickFiles(k); // nello stesso tocco, altrimenti l'iPhone non apre la galleria
   }));
