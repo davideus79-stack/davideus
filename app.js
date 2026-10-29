@@ -1322,12 +1322,36 @@
     dlg.showModal();
     const [url, dl] = await Promise.all([signedUrl(item.file_path), signedUrl(item.file_path, item.file_name)]);
     $("viewer-download").href = dl;
+    viewerItem = item;
+    $("viewer-share").classList.toggle("hidden", !CAN_SHARE_FILES);
+    $("viewer-download").classList.toggle("hidden", CAN_SHARE_FILES);
     const m = item.mime_type || "";
     if (m.startsWith("image/")) body.innerHTML = `<img src="${esc(url)}" alt="">`;
     else if (m.startsWith("video/")) body.innerHTML = `<video src="${esc(url)}" controls autoplay playsinline></video>`;
     else body.innerHTML = `<iframe src="${esc(url)}" title="${esc(item.file_name)}"></iframe>`;
   }
-  $("viewer-close").addEventListener("click", () => $("viewer").close());
+  // Chiudere l'anteprima: X in alto, Chiudi in basso, tocco sullo sfondo o trascinando giù
+  let viewerItem = null;
+  const closeViewer = () => $("viewer").close();
+  $("viewer-close").addEventListener("click", closeViewer);
+  $("viewer-close2").addEventListener("click", closeViewer);
+  $("viewer-share").addEventListener("click", (e) => { if (viewerItem) shareFile(viewerItem, e.currentTarget).catch((err) => toast(translateError(err))); });
+  $("viewer-body").addEventListener("click", (e) => { if (e.target === $("viewer-body") || e.target.tagName === "IMG") closeViewer(); });
+  let vy = null;
+  $("viewer-body").addEventListener("touchstart", (e) => { vy = e.touches.length === 1 ? e.touches[0].clientY : null; }, { passive: true });
+  $("viewer-body").addEventListener("touchmove", (e) => {
+    if (vy === null) return;
+    const dy = e.touches[0].clientY - vy;
+    const media = $("viewer-body").firstElementChild;
+    if (media && dy > 0 && media.tagName === "IMG") { media.style.transform = `translateY(${dy}px)`; media.style.opacity = String(Math.max(0.3, 1 - dy / 400)); }
+  }, { passive: true });
+  $("viewer-body").addEventListener("touchend", (e) => {
+    if (vy === null) return;
+    const dy = e.changedTouches[0].clientY - vy; vy = null;
+    const media = $("viewer-body").firstElementChild;
+    if (dy > 90) closeViewer();
+    else if (media) { media.style.transform = ""; media.style.opacity = ""; }
+  });
   $("viewer").addEventListener("close", () => { $("viewer-body").innerHTML = ""; });
 
   // ---------- Menu ----------

@@ -363,13 +363,15 @@
 
   <dialog id="viewer" class="viewer">
     <div class="viewer-bar">
+      <button id="viewer-close" class="v-btn v-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       <span id="viewer-title"></span>
-      <div>
-        <a id="viewer-download" class="btn soft small" href="#">Scarica</a>
-        <button id="viewer-close" class="btn soft small">Chiudi</button>
-      </div>
     </div>
     <div id="viewer-body" class="viewer-body"></div>
+    <div class="viewer-foot">
+      <a id="viewer-download" class="v-btn v-wide" href="#"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5M4 20h16"/></svg><span>Scarica</span></a>
+      <button id="viewer-share" class="v-btn v-wide hidden" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12m0-12L8 7m4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Salva</span></button>
+      <button id="viewer-close2" class="v-btn v-wide" type="button"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Chiudi</span></button>
+    </div>
   </dialog>
 
   <script src="vendor/supabase.js"></script>
