@@ -242,20 +242,20 @@
   <dialog id="note-dlg" class="sheet">
     <div class="sheet-card note-card">
       <div class="note-card-head">
-        <button id="note-cancel" class="btn soft small" type="button">Annulla</button>
+        <button id="note-cancel" class="btn soft nb" type="button" aria-label="Annulla"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Annulla</span></button>
         <h2 id="note-dlg-title">Nuova nota</h2>
-        <button id="note-save" class="btn primary small" type="button" disabled>Salva</button>
+        <button id="note-save" class="btn primary nb" type="button" disabled><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg><span>Salva</span></button>
       </div>
       <div id="note-mode" class="note-mode" role="group" aria-label="Tipo di nota">
         <button type="button" data-mode="text" class="on">Testo</button>
         <button type="button" data-mode="list">Lista con le spunte</button>
       </div>
-      <textarea id="note-input" rows="7" placeholder="Scrivi una nota…"></textarea>
       <label class="note-remind">
         <span class="nr-ico" data-ico="bell"></span><span class="nr-l">Ricordamelo</span>
         <input id="note-remind" type="datetime-local">
         <button id="note-remind-clear" class="nr-x hidden" type="button" aria-label="Togli il promemoria">×</button>
       </label>
+      <textarea id="note-input" rows="7" placeholder="Scrivi una nota…"></textarea>
     </div>
   </dialog>
 

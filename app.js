@@ -334,6 +334,20 @@
     const rv = $("note-remind").value;
     const remind_at = rv ? new Date(rv).toISOString() : null;
     if (remind_at) ensurePush(permAsk);
+    if (state.editNote) {
+      const ed = state.editNote;
+      const changes = { content: text };
+      if ((ed.remind_at || null) !== remind_at && !(ed.remind_at && remind_at && new Date(ed.remind_at).getTime() === new Date(remind_at).getTime())) { changes.remind_at = remind_at; changes.reminded = false; }
+      const r = await sb.from("items").update(changes).eq("id", ed.id).select().single();
+      if (r.error) { toast(translateError(r.error)); $("note-save").disabled = false; return; }
+      state.items = state.items.map((i) => (i.id === ed.id ? { ...i, ...changes, ...(r.data || {}) } : i));
+      state.editNote = null;
+      noteInput.value = ""; $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden");
+      $("note-dlg").close();
+      render();
+      toast("Nota aggiornata");
+      return;
+    }
     const { data, error } = await sb.from("items").insert({ kind: "note", content: text, source: DEVICE, folder_id: state.folder, remind_at, event_date: state.noteDay ? (remind_at ? dkey(new Date(remind_at)) : state.noteDay) : null }).select().single();
     if (error) { toast(translateError(error)); $("note-save").disabled = false; return; }
     noteInput.value = "";
@@ -723,12 +737,7 @@
         await navigator.clipboard.writeText(plainText(item));
         toast("Copiato");
       } else if (act === "edit") {
-        state.editing = item.id;
-        render();
-        const p = card.parentElement.querySelector(`[data-id="${item.id}"] .note-text`);
-        p.focus();
-        document.getSelection().selectAllChildren(p);
-        document.getSelection().collapseToEnd();
+        openNote({ edit: item }); // si modifica a tutto schermo, come quando si scrive
       } else if (act === "save") {
         const p = card.querySelector(".note-text");
         const text = p.innerText.trim();
@@ -1130,7 +1139,10 @@
   function openNote(opts) {
     const cur = state.folders.find((f) => f.id === state.folder);
     const rem = opts && opts.remind;
-    state.noteDay = (opts && opts.day) || null;
+    const ed = (opts && opts.edit) || null;
+    if (state.editNote && !ed) noteInput.value = ""; // non riportare il testo di una modifica annullata
+    state.editNote = ed;
+    state.noteDay = ed ? ed.event_date || null : (opts && opts.day) || null;
     const dayLabel = state.noteDay && fromKey(state.noteDay).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
     $("note-dlg-title").textContent = rem ? (dayLabel ? "Promemoria · " + dayLabel : "Nuovo promemoria") : dayLabel ? "Nota · " + dayLabel : cur ? "Nota in " + cur.name : "Nuova nota";
     $("note-save").disabled = !noteInput.value.trim();
@@ -1145,8 +1157,16 @@
       $("note-remind").value = ""; $("note-remind-clear").classList.add("hidden");
     }
     $("note-dlg").classList.toggle("is-remind", !!rem);
+    $("note-dlg").classList.toggle("is-edit", !!ed);
+    if (ed) {
+      $("note-dlg-title").textContent = "Modifica nota";
+      noteInput.value = ed.content || "";
+      $("note-remind").value = ed.remind_at && !ed.reminded ? toLocalInput(new Date(ed.remind_at)) : "";
+      $("note-remind-clear").classList.toggle("hidden", !$("note-remind").value);
+      $("note-save").disabled = false;
+    }
     $("note-dlg").showModal();
-    setTimeout(() => noteInput.focus(), 60);
+    setTimeout(() => { noteInput.focus(); if (ed) noteInput.setSelectionRange(noteInput.value.length, noteInput.value.length); }, 60);
   }
   function onAdd() {
     if (state.screen === "folders") return openFolderName(null);
