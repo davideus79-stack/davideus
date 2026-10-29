@@ -24,12 +24,12 @@
   // ---------- Utilità ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  function toast(msg) {
+  function toast(msg, ms) {
     const t = $("toast");
     t.textContent = msg;
     t.classList.add("show");
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => t.classList.remove("show"), msg.length > 60 ? 6000 : 2600);
+    toast._t = setTimeout(() => t.classList.remove("show"), ms || (msg.length > 60 ? 6000 : 2600));
   }
 
   function fmtSize(b) {
@@ -976,8 +976,11 @@
       let sub = await reg.pushManager.getSubscription();
       if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(cfg.vapidPublicKey) });
       const j = sub.toJSON();
-      const { error } = await sb.from("push_subs").upsert({ user_id: state.user.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, device: DEVICE }, { onConflict: "endpoint" });
+      const { error } = await sb.from("push_subs").upsert({ user_id: state.user.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, device: DEVICE, device_id: DEVICE_ID }, { onConflict: "endpoint" });
       if (error) throw error;
+      // toglie le vecchie iscrizioni di questo stesso dispositivo (evita doppioni e indirizzi scaduti)
+      sb.from("push_subs").delete().eq("user_id", state.user.id).eq("device_id", DEVICE_ID).neq("endpoint", j.endpoint).then(() => {});
+      sb.from("push_subs").delete().eq("user_id", state.user.id).eq("device", DEVICE).is("device_id", null).neq("endpoint", j.endpoint).then(() => {});
       if (loud) toast("Notifiche attive su questo dispositivo");
       updatePushUi(true);
       return true;
@@ -1001,11 +1004,43 @@
     $("menu").classList.add("hidden");
     const wasOn = $("push-toggle").dataset.on;
     const ok = await ensurePush(p, !wasOn);
-    if (ok && wasOn) {
-      const reg = await navigator.serviceWorker.ready;
-      reg.showNotification("⏰ MyHome", { body: "Le notifiche funzionano su questo dispositivo.", icon: "icons/icon-192.png" });
-    }
+    if (ok && wasOn) testPush();
   });
+  // Prova vera: il server manda una notifica dopo 5 secondi, come farebbe con un promemoria
+  async function testPush() {
+    toast(IS_MOBILE ? "Ora chiudi l'app (torna alla schermata Home): tra 5 secondi arriva la prova" : "Tra 5 secondi arriva una notifica di prova", 6000);
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const r = await fetch(`${cfg.supabaseUrl}/functions/v1/remind`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token, apikey: cfg.supabaseKey },
+        body: JSON.stringify({ test: true }),
+      });
+      const j = await r.json();
+      const ok = (j.results || []).filter((x) => x.status >= 200 && x.status < 300).length;
+      if (!ok) toast("La prova non è partita: tocca di nuovo \"Attiva le notifiche\"");
+    } catch (e) { toast("Prova non riuscita: controlla la connessione"); }
+  }
+
+  // Con l'app aperta l'iPhone spesso non mostra il banner: allora avvisa l'app stessa
+  const alerted = new Set((() => { try { return JSON.parse(localStorage.getItem("myhome-alerted") || "[]"); } catch (e) { return []; } })());
+  function checkDue() {
+    if (!state.user || document.hidden) return;
+    const now = Date.now();
+    for (const it of state.items) {
+      if (!it.remind_at) continue;
+      const t = new Date(it.remind_at).getTime();
+      const key = it.id + "@" + it.remind_at;
+      if (t > now || now - t > 10 * 60e3 || alerted.has(key)) continue;
+      alerted.add(key);
+      try { localStorage.setItem("myhome-alerted", JSON.stringify([...alerted].slice(-200))); } catch (e) {}
+      const body = it.kind === "note" ? plainText(it).split("\n")[0].replace(/^[•✓] /, "").slice(0, 80) : it.file_name;
+      toast("⏰ Promemoria: " + body, 12000);
+      try { navigator.vibrate && navigator.vibrate(200); } catch (e) {}
+    }
+  }
+  setInterval(checkDue, 15000);
+  document.addEventListener("visibilitychange", checkDue);
 
   // Finestra promemoria
   let remItem = null;

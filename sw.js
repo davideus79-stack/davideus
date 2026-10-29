@@ -1,5 +1,5 @@
 // Tiene in memoria l'app (non i tuoi dati) per aprirla più in fretta.
-const CACHE = "myhome-v19";
+const CACHE = "myhome-v20";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "config.js", "vendor/supabase.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
@@ -23,7 +23,7 @@ self.addEventListener("push", (e) => {
   try { d = e.data.json(); } catch (err) { d = { title: "MyHome", body: e.data ? e.data.text() : "" }; }
   e.waitUntil(self.registration.showNotification(d.title || "MyHome", {
     body: d.body || "", tag: d.tag, icon: "icons/icon-192.png", badge: "icons/icon-192.png", data: { url: d.url || "./" },
-  }));
+  }).then(() => (d.ack ? fetch(d.ack).catch(() => {}) : null)));
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
