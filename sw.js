@@ -1,5 +1,5 @@
 // Tiene in memoria l'app (non i tuoi dati) per aprirla più in fretta.
-const CACHE = "myhome-v23";
+const CACHE = "myhome-v24";
 const SHELL = [
   "./", "index.html", "styles.css", "app.js", "config.js", "vendor/supabase.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
@@ -37,8 +37,9 @@ self.addEventListener("notificationclick", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
+  // "no-cache": chiede sempre al sito se c'è una versione nuova (GitHub Pages altrimenti tiene la vecchia per 10 minuti)
   e.respondWith(
-    fetch(e.request)
+    fetch(url.href, { cache: "no-cache", credentials: "same-origin" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
