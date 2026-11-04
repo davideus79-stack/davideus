@@ -36,22 +36,6 @@
   --pdf: #e5484d; --docx: #2f6fe0; --xlsx: #1f9a5a;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #141416; --bg-2: #1c1c20; --surface: #1f1f24; --surface-2: #26262c;
-    --ink: #f2f1ee; --ink-2: #b4b3bb; --ink-3: #7d7c86; --line: #33333a;
-    --accent: #7b8bff; --accent-ink: #0d0f24; --accent-soft: #262b52;
-    --stage: #0e0e10;
-    --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 8px 40px rgba(0,0,0,.55);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #141416; --bg-2: #1c1c20; --surface: #1f1f24; --surface-2: #26262c;
-  --ink: #f2f1ee; --ink-2: #b4b3bb; --ink-3: #7d7c86; --line: #33333a;
-  --accent: #7b8bff; --accent-ink: #0d0f24; --accent-soft: #262b52;
-  --stage: #0e0e10; color-scheme: dark;
-}
 
 /* ===== Base ===== */
 *, *::before, *::after { box-sizing: border-box; }
