@@ -1,0 +1,162 @@
+import { textToPng } from '../fonts.js';
+import { rasterToPdf } from '../export.js';
+import { snapshot, NS, parseXml, serializeXml, ensureContentDefault, addRelationship, resolvePart, mainPartPath, relsPathFor, dataUrlToBase64 } from './ooxml.js';
+
+const EMU_PER_PX = 9525;
+
+function bodyParagraphs(xml) {
+  const body = xml.getElementsByTagNameNS(NS.w, 'body')[0];
+  return Array.from(body.children).filter((n) => n.namespaceURI === NS.w && n.localName === 'p');
+}
+function insertAtParaStart(p, node) {
+  const first = p.firstElementChild;
+  if (first && first.namespaceURI === NS.w && first.localName === 'pPr') first.after(node);
+  else p.insertBefore(node, p.firstChild);
+}
+
+// A copy of the document where every top-level paragraph starts with a
+// bookmark "_pp_<n>". docx-preview renders bookmarks as <span id>, which lets
+// us know on which rendered page each paragraph starts.
+async function taggedCopy(bytes) {
+  const zip = await JSZip.loadAsync(bytes);
+  const main = await mainPartPath(zip);
+  const xml = parseXml(await zip.file(main).async('string'));
+  bodyParagraphs(xml).forEach((p, i) => {
+    const s = xml.createElementNS(NS.w, 'w:bookmarkStart');
+    s.setAttributeNS(NS.w, 'w:id', String(800000 + i));
+    s.setAttributeNS(NS.w, 'w:name', `_pp_${i}`);
+    const e = xml.createElementNS(NS.w, 'w:bookmarkEnd');
+    e.setAttributeNS(NS.w, 'w:id', String(800000 + i));
+    insertAtParaStart(p, e);
+    insertAtParaStart(p, s);
+  });
+  zip.file(main, serializeXml(xml));
+  return zip.generateAsync({ type: 'blob' });
+}
+
+function fullHeight(sec) {
+  return Math.ceil(Math.max(sec.offsetHeight, sec.scrollHeight));
+}
+
+async function settleLayout(root) {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  const timeout = new Promise((r) => setTimeout(r, 4000));
+  await Promise.race([
+    Promise.all([
+      document.fonts ? document.fonts.ready : null,
+      ...imgs.map((img) => (img.decode ? img.decode() : Promise.resolve()).catch(() => {})),
+    ]),
+    timeout,
+  ]);
+  // rAF is paused in background tabs: never wait on it alone.
+  await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 100); });
+}
+
+export async function loadDocx(bytes, name) {
+  const sandbox = document.getElementById('render-sandbox');
+  const host = document.createElement('div');
+  const styleHost = document.createElement('div');
+  styleHost.className = 'docx-styles';
+  sandbox.appendChild(host);
+  document.body.appendChild(styleHost);
+
+  let blob;
+  try { blob = await taggedCopy(bytes); } catch { blob = new Blob([bytes]); }
+  await docx.renderAsync(blob, host, styleHost, {
+    className: 'docx',
+    inWrapper: false,
+    breakPages: true,
+    ignoreLastRenderedPageBreak: false,
+    ignoreWidth: false,
+    ignoreHeight: false,
+    renderHeaders: true,
+    renderFooters: true,
+    renderFootnotes: true,
+    renderEndnotes: true,
+    useBase64URL: true,
+    experimental: true,
+  });
+
+  const sections = Array.from(host.querySelectorAll('section.docx'));
+  if (!sections.length) throw new Error('Documento Word vuoto o non leggibile');
+  // Images and fonts load after renderAsync resolves and make the content
+  // taller: measure only once they are ready, or the page bottom gets cut.
+  await settleLayout(host);
+  let lastPara = 0;
+  const pages = sections.map((sec, index) => {
+    const w = sec.offsetWidth;
+    let h = fullHeight(sec);
+    const ids = Array.from(sec.querySelectorAll('span[id^="_pp_"]')).map((s) => +s.id.slice(4)).filter(Number.isFinite);
+    const firstPara = ids.length ? Math.min(...ids) : null;
+    const anchorPara = firstPara ?? lastPara;
+    if (ids.length) lastPara = Math.max(...ids);
+    return {
+      index, w, h, toPt: 0.75, section: sec, anchorPara, exact: firstPara !== null,
+      mount(content) {
+        this._content = content;
+        content.style.width = w + 'px';
+        content.appendChild(sec);
+        h = this.h = Math.max(h, fullHeight(sec));
+        content.style.height = h + 'px';
+      },
+      render(scale) { this._content && (this._content.style.transform = `scale(${scale})`); },
+    };
+  });
+
+  return {
+    kind: 'docx',
+    name,
+    bytes,
+    unit: 'px',
+    pages,
+    destroy() { host.remove(); styleHost.remove(); },
+    exportOriginal: (els) => exportDocx(bytes, pages, els),
+    async exportPdf(els) {
+      const shots = [];
+      for (const p of pages) shots.push({ canvas: await snapshot(p.section, { width: p.w, height: p.h }), w: p.w, h: p.h, toPt: 0.75, index: p.index });
+      return rasterToPdf(shots, els);
+    },
+  };
+}
+
+async function exportDocx(bytes, pages, elements) {
+  const zip = await JSZip.loadAsync(bytes);
+  const main = await mainPartPath(zip);
+  const xml = parseXml(await zip.file(main).async('string'));
+  const root = xml.documentElement;
+  for (const [p, uri] of [['wp', NS.wp], ['a', NS.a], ['pic', NS.pic], ['r', NS.r]]) {
+    if (!root.lookupNamespaceURI(p)) root.setAttributeNS('http://www.w3.org/2000/xmlns/', `xmlns:${p}`, uri);
+  }
+  const relsPath = relsPathFor(main);
+  const rels = zip.file(relsPath) ? parseXml(await zip.file(relsPath).async('string')) : parseXml(`<Relationships xmlns="${NS.rel}"/>`);
+  const paras = bodyParagraphs(xml);
+  const dir = main.slice(0, main.lastIndexOf('/') + 1);
+  const stamp = Date.now().toString(36);
+
+  let n = 0;
+  for (const el of elements) {
+    const page = pages[el.page];
+    if (!page) continue;
+    let para = paras[Math.min(page.anchorPara, paras.length - 1)];
+    if (!para) {
+      const body = xml.getElementsByTagNameNS(NS.w, 'body')[0];
+      para = xml.createElementNS(NS.w, 'w:p');
+      body.insertBefore(para, body.firstChild);
+    }
+    const png = el.type === 'sig' ? el.src : await textToPng(el, 5);
+    n++;
+    const media = `media/pdfplus_${stamp}_${n}.png`;
+    zip.file(dir + media, dataUrlToBase64(png), { base64: true });
+    const rId = addRelationship(rels, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image', media);
+    const id = 70000 + n;
+    const cx = Math.round(el.w * EMU_PER_PX), cy = Math.round(el.h * EMU_PER_PX);
+    const x = Math.round(el.x * EMU_PER_PX), y = Math.round(el.y * EMU_PER_PX);
+    const frag = parseXml(`<w:r xmlns:w="${NS.w}" xmlns:wp="${NS.wp}" xmlns:a="${NS.a}" xmlns:pic="${NS.pic}" xmlns:r="${NS.r}"><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251660000 + n}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${x}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${y}</wp:posOffset></wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="PdfPlus ${n}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="pdfplus_${n}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`);
+    insertAtParaStart(para, xml.importNode(frag.documentElement, true));
+  }
+
+  zip.file(main, serializeXml(xml));
+  zip.file(relsPath, serializeXml(rels));
+  await ensureContentDefault(zip, 'png', 'image/png');
+  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', compression: 'DEFLATE' });
+}

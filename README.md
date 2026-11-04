@@ -5,6 +5,7 @@ Note e file dal tuo iPhone al tuo PC, all'istante.
 - Scrivi una nota o carica foto, video, Word, Excel, PDF dal telefono: compaiono subito sul PC (e viceversa).
 - Ognuno entra con la sua email e vede solo le sue cose.
 - Puoi cancellare un elemento o tutto quanto dal menu.
+- **Pdf plus**: firma, annota e stampa PDF, Word ed Excel (riquadro nella Home, oppure il tasto con la firma accanto a un documento). Il file firmato si può rimettere in MyHome con «Salva in MyHome».
 - Cinque stili grafici (Aurora, Notte, Carta, Tramonto, Oceano), da cambiare quando vuoi dal menu.
 
 ## Come si installa sull'iPhone

@@ -99,6 +99,7 @@
     star: '<svg viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>',
     bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
     list: '<svg viewBox="0 0 24 24"><path d="m4 6 1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6h9M11 12h9M11 18h9"/></svg>',
+    sign: '<svg viewBox="0 0 24 24"><path d="M3 17c3-4 5-9 7-9s-1.5 8 1 8 3.5-4 5-4-.5 3 1 3 2-1 4-1"/><path d="M3 21h18"/></svg>',
   };
 
   // ---------- Link temporanei ai file ----------
@@ -223,7 +224,7 @@
     const t = state.user.user_metadata && state.user.user_metadata.theme;
     if (t) applyTheme(t);
     updateFaceIdUi();
-    if (!state.justLoggedIn) showLock(); // appena entrato con la password non serve chiedere anche il Face ID
+    if (!state.justLoggedIn && !backFromPdfPlus()) showLock(); // appena entrato con la password non serve chiedere anche il Face ID
     else if (lock.supported && !fidGet() && state.lastPassword) openSetup(); // propone subito il Face ID
     state.justLoggedIn = false;
     await loadItems();
@@ -643,6 +644,7 @@
     const canView = cat === "media" || m === "application/pdf";
     name = `<button class="row-name" data-act="${canView ? "view" : CAN_SHARE_FILES ? "share" : "download"}">${esc(item.file_name)}</button>`;
     actions = `${starBtn(item, "ra")}${canView ? `<button class="ra" data-act="view" title="Apri" aria-label="Apri">${ICONS.open}</button>` : ""}
+      ${pdfKind(item) ? `<button class="ra" data-act="sign" title="Firma con Pdf plus" aria-label="Firma con Pdf plus">${ICONS.sign}</button>` : ""}
       ${CAN_SHARE_FILES
         ? `<button class="ra" data-act="share" title="Salva sull'iPhone" aria-label="Salva sull'iPhone">${ICONS.share}</button>`
         : `<button class="ra" data-act="download" title="Scarica" aria-label="Scarica">${ICONS.down}</button>`}
@@ -697,6 +699,7 @@
       <div class="card-actions">
         ${starBtn(item, "act icon")}
         ${canView ? `<button class="act" data-act="view">${ICONS.open}Apri</button>` : ""}
+        ${pdfKind(item) ? `<button class="act" data-act="sign" title="Firma con Pdf plus">${ICONS.sign}Firma</button>` : ""}
         ${CAN_SHARE_FILES
           ? `<button class="act" data-act="share">${ICONS.share}Salva sull'iPhone</button>`
           : `<button class="act" data-act="download">${ICONS.down}Scarica</button>`}
@@ -753,6 +756,8 @@
         openViewer(item);
       } else if (act === "move") {
         openMove(item);
+      } else if (act === "sign") {
+        await openPdfPlus(item);
       } else if (act === "share") {
         await shareFile(item, btn);
       } else if (act === "download") {
@@ -793,6 +798,7 @@
     cal: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
     clip: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>',
+    sign: ICONS.sign,
   };
   document.querySelectorAll("[data-ico]").forEach((el) => (el.innerHTML = FILTER_ICONS[el.dataset.ico]));
 
@@ -1336,6 +1342,71 @@
 
   const shareFile = async (item) => openSave(item);
 
+  // ---------- Pdf plus (firma, annota e stampa PDF, Word ed Excel) ----------
+  // Vive nella cartella pdfplus/ dello stesso sito: stesso accesso, nessun programma da installare.
+  const PDFPLUS_FLAG = "myhome-pdfplus";
+  function pdfKind(item) {
+    if (item.kind !== "file" || !item.file_name) return null;
+    const ext = item.file_name.toLowerCase().split(".").pop();
+    return ext === "pdf" ? "pdf" : ext === "docx" ? "docx" : ext === "xlsx" || ext === "xlsm" ? "xlsx" : null;
+  }
+  // Mette il file nell'archivio di Pdf plus su questo dispositivo (stesso formato che usa Pdf plus)
+  function pdfplusPut(rec) {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("pdfplus", 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv");
+        if (!d.objectStoreNames.contains("docs")) d.createObjectStore("docs", { keyPath: "id" });
+      };
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const d = req.result;
+        const t = d.transaction("docs", "readwrite");
+        const store = t.objectStore("docs");
+        const get = store.get(rec.id);
+        get.onsuccess = () => {
+          const old = get.result;
+          // se l'avevi già aperto, ritrovi firme e scritte dove le avevi messe
+          if (old && old.bytes && old.bytes.byteLength === rec.bytes.byteLength) rec.elements = old.elements || [];
+          store.put(rec);
+        };
+        t.oncomplete = () => { d.close(); resolve(); };
+        t.onerror = () => { d.close(); reject(t.error); };
+      };
+    });
+  }
+  async function openPdfPlus(item) {
+    let url = "pdfplus/";
+    if (item) {
+      const kind = pdfKind(item);
+      if (!kind) return toast("Pdf plus apre solo PDF, Word (.docx) ed Excel (.xlsx)");
+      toast("Apro " + item.file_name + "…", 8000);
+      const res = await fetch(await signedUrl(item.file_path));
+      if (!res.ok) throw new Error("download");
+      const bytes = await res.arrayBuffer();
+      const id = "mh-" + item.id;
+      await pdfplusPut({ id, name: item.file_name, kind, bytes, elements: [], updated: Date.now(), myhome: { itemId: item.id, folderId: item.folder_id || null } });
+      url += "?open=" + encodeURIComponent(id);
+    }
+    try { sessionStorage.setItem(PDFPLUS_FLAG, String(Date.now())); } catch (e) {}
+    location.href = url;
+  }
+  // Tornando da Pdf plus non si richiede il Face ID (Pdf plus lo toglie se esci dall'app per più di 10 secondi)
+  function backFromPdfPlus() {
+    let on = false;
+    try { on = !!sessionStorage.getItem(PDFPLUS_FLAG); } catch (e) {}
+    if (on) {
+      lock.hiddenAt = 0;
+      setTimeout(() => { try { sessionStorage.removeItem(PDFPLUS_FLAG); } catch (e) {} }, 3000);
+    }
+    return on;
+  }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-pdfplus]") || !state.user) return;
+    openPdfPlus().catch((err) => toast(translateError(err)));
+  });
+
   async function deleteItems(items) {
     const paths = items.filter((i) => i.file_path).map((i) => i.file_path);
     for (let k = 0; k < paths.length; k += 100) {
@@ -1613,10 +1684,10 @@
   });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") lock.hiddenAt = Date.now();
-    else if (state.user && lock.hiddenAt && Date.now() - lock.hiddenAt > LOCK_AFTER_MS) showLock();
+    else if (state.user && lock.hiddenAt && Date.now() - lock.hiddenAt > LOCK_AFTER_MS && !backFromPdfPlus()) showLock();
   });
   // iPhone: quando l'app torna dalla memoria senza ricaricarsi
-  window.addEventListener("pageshow", (e) => { if (e.persisted && state.user) showLock(); });
+  window.addEventListener("pageshow", (e) => { if (e.persisted && state.user && !backFromPdfPlus()) showLock(); });
 
   // ---------- Avvio ----------
   setInterval(() => { if (state.user && !state.editing) render(); }, 60 * 1000); // aggiorna "x min fa"

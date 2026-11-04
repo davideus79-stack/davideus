@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pdf plus · MyHome</title>
+  <meta name="description" content="Firma, annota e stampa documenti PDF, Word ed Excel.">
+  <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<main id="home" class="screen is-active" aria-labelledby="home-title">
+  <header class="home-head">
+    <button class="mh-back" id="btn-myhome" type="button" aria-label="Torna a MyHome">
+      <svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg><span>MyHome</span>
+    </button>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M9 4h10l6 6v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="currentColor" opacity=".16"/><path d="M9 4h10l6 6v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M11 21c2-3 3.5-6 5-6s-1 5 .5 5 2.5-3 3.5-3 0 2 1 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <h1 id="home-title">Pdf plus</h1>
+    </div>
+    <button class="icon-btn" id="btn-settings" aria-label="Impostazioni firma">
+      <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+    </button>
+  </header>
+
+  <section class="hero">
+    <p class="hero-kicker">Firma in pochi secondi</p>
+    <h2 class="hero-title">Apri un documento,<br>firmalo, stampalo.</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file-input" accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+      <span class="drop-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      </span>
+      <span class="drop-main">Apri documento</span>
+      <span class="drop-sub">PDF, Word o Excel<span class="desktop-only"> · oppure trascinalo qui</span></span>
+    </label>
+    <div class="formats" aria-hidden="true">
+      <span class="fmt fmt-pdf">PDF</span><span class="fmt fmt-docx">DOCX</span><span class="fmt fmt-xlsx">XLSX</span>
+    </div>
+  </section>
+
+  <section class="sig-card" id="sig-card" aria-label="La tua firma">
+    <div class="sig-card-preview checker" id="sig-card-preview"></div>
+    <div class="sig-card-body">
+      <h3 id="sig-card-title">La tua firma</h3>
+      <p id="sig-card-text">Salvata su questo dispositivo, pronta per ogni documento.</p>
+    </div>
+    <button class="btn btn-ghost" id="btn-sig-edit">Modifica</button>
+  </section>
+
+  <section class="recent" id="recent" hidden>
+    <div class="section-head">
+      <h3>Recenti</h3>
+    </div>
+    <ul class="recent-list" id="recent-list"></ul>
+  </section>
+
+  <footer class="home-foot" id="home-foot">I documenti restano su questo dispositivo. Vanno in MyHome solo se scegli “Salva in MyHome”.</footer>
+</main>
+
+<!-- ============ EDITOR ============ -->
+<section id="editor" class="screen" aria-label="Editor documento">
+  <header class="ed-bar">
+    <button class="icon-btn" id="btn-back" aria-label="Indietro">
+      <svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg>
+    </button>
+    <div class="ed-title">
+      <span class="ed-badge" id="ed-badge">PDF</span>
+      <span class="ed-name" id="ed-name">Documento</span>
+    </div>
+    <div class="ed-actions">
+      <button class="icon-btn" id="btn-preview" aria-label="Anteprima" aria-pressed="false" title="Anteprima">
+        <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-print" aria-label="Stampa" title="Stampa">
+        <svg viewBox="0 0 24 24"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+      </button>
+      <button class="btn btn-primary btn-sm" id="btn-save">Salva</button>
+    </div>
+  </header>
+
+  <div class="ed-stage" id="stage">
+    <div class="pages" id="pages"></div>
+  </div>
+
+  <div class="zoom" aria-label="Zoom">
+    <button class="zoom-btn" id="zoom-out" aria-label="Riduci zoom">−</button>
+    <button class="zoom-val" id="zoom-fit" aria-label="Adatta alla larghezza">100%</button>
+    <button class="zoom-btn" id="zoom-in" aria-label="Aumenta zoom">+</button>
+  </div>
+
+  <!-- Contextual panel for the selected element -->
+  <div class="props" id="props" hidden>
+    <div class="props-row" id="props-text">
+      <div class="font-strip" id="font-strip" role="listbox" aria-label="Carattere"></div>
+    </div>
+    <div class="props-row" id="props-date" hidden>
+      <div class="chip-strip" id="date-strip" role="listbox" aria-label="Formato data"></div>
+    </div>
+    <div class="props-row props-main">
+      <div class="stepper" aria-label="Dimensione">
+        <button class="step" id="size-down" aria-label="Più piccolo">
+          <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+        </button>
+        <span class="step-val" id="size-val">100%</span>
+        <button class="step" id="size-up" aria-label="Più grande">
+          <svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>
+        </button>
+      </div>
+      <div class="swatches" id="swatches" aria-label="Colore"></div>
+      <button class="tool-btn" id="btn-bold" aria-label="Grassetto" aria-pressed="false"><b>B</b></button>
+      <button class="tool-btn" id="btn-edit-text" aria-label="Modifica testo">
+        <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>
+      </button>
+      <button class="tool-btn" id="btn-dup" aria-label="Duplica">
+        <svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+      </button>
+      <button class="tool-btn danger" id="btn-del" aria-label="Elimina">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <nav class="dock" aria-label="Aggiungi">
+    <button class="dock-btn" id="add-sig">
+      <svg viewBox="0 0 24 24"><path d="M3 17c3-4 5-9 7-9s-1.5 8 1 8 3.5-4 5-4-.5 3 1 3 2-1 4-1"/><path d="M3 21h18"/></svg>
+      <span>Firma</span>
+    </button>
+    <button class="dock-btn" id="add-date">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      <span>Data</span>
+    </button>
+    <button class="dock-btn" id="add-text">
+      <svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>
+      <span>Testo</span>
+    </button>
+  </nav>
+</section>
+
+<!-- ============ SIGNATURE SHEET ============ -->
+<div class="sheet-backdrop" id="sig-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sig-sheet-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="sig-sheet-title">La tua firma</h2>
+    <p class="sheet-sub" id="sig-sheet-sub">Caricala una sola volta: resterà salvata su questo dispositivo.</p>
+
+    <div class="seg" role="tablist">
+      <button class="seg-btn is-on" role="tab" id="tab-upload" aria-selected="true">Carica immagine</button>
+      <button class="seg-btn" role="tab" id="tab-draw" aria-selected="false">Disegna</button>
+    </div>
+
+    <div class="sig-pane" id="pane-upload">
+      <label class="sig-drop checker" id="sig-drop">
+        <input type="file" id="sig-input" accept="image/*" hidden>
+        <img id="sig-preview" alt="Anteprima firma" hidden>
+        <span class="sig-drop-hint" id="sig-drop-hint">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>
+          Scegli una foto o un'immagine della firma
+          <small>Meglio su foglio bianco, penna scura</small>
+        </span>
+      </label>
+      <div class="sig-tune" id="sig-tune" hidden>
+        <label class="slider-row">
+          <span>Pulizia sfondo</span>
+          <input type="range" id="sig-threshold" min="120" max="245" value="200">
+        </label>
+        <div class="ink-row">
+          <span>Inchiostro</span>
+          <div class="ink-opts" id="ink-opts">
+            <button class="ink is-on" data-ink="original" aria-label="Originale"><i style="background:linear-gradient(135deg,#333,#2a4a9a)"></i></button>
+            <button class="ink" data-ink="#111111" aria-label="Nero"><i style="background:#111"></i></button>
+            <button class="ink" data-ink="#1a3a9c" aria-label="Blu"><i style="background:#1a3a9c"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sig-pane" id="pane-draw" hidden>
+      <div class="pad-wrap">
+        <canvas id="sig-pad" aria-label="Area per disegnare la firma"></canvas>
+        <span class="pad-line" aria-hidden="true"></span>
+        <button class="btn btn-ghost btn-sm pad-clear" id="pad-clear">Cancella</button>
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-ghost" id="sig-cancel">Annulla</button>
+      <button class="btn btn-primary" id="sig-save" disabled>Salva firma</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SAVE SHEET ============ -->
+<div class="sheet-backdrop" id="save-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="save-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="save-title">Salva documento</h2>
+    <div class="save-opts">
+      <button class="save-opt" id="save-orig">
+        <span class="fmt" id="save-orig-badge">PDF</span>
+        <span class="save-opt-text"><b id="save-orig-label">Formato originale</b><small id="save-orig-sub">Stesso tipo di file che hai aperto</small></span>
+      </button>
+      <button class="save-opt" id="save-pdf">
+        <span class="fmt fmt-pdf">PDF</span>
+        <span class="save-opt-text"><b>Come PDF</b><small>Ideale da inviare o archiviare</small></span>
+      </button>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-ghost" id="save-cancel">Annulla</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ READY SHEET (iPhone: share/print needs a fresh tap) ============ -->
+<div class="sheet-backdrop" id="ready-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ready-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="ready-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+    <h2 id="ready-title">Documento pronto</h2>
+    <p class="sheet-sub" id="ready-sub"></p>
+    <div class="ready-actions">
+      <button class="btn btn-primary" id="ready-go">Continua</button>
+      <button class="btn btn-ghost" id="ready-alt" hidden>Altro</button>
+      <button class="btn btn-ghost" id="ready-cancel">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<div class="busy" id="busy" hidden><div class="busy-card"><span class="spinner"></span><span id="busy-text">Attendere…</span></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="print-area" aria-hidden="true"></div>
+<div id="render-sandbox" aria-hidden="true"></div>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/fontkit.umd.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/docx-preview.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/html2canvas.min.js"></script>
+<script src="../vendor/supabase.js"></script>
+<script src="../config.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

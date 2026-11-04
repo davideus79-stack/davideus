@@ -865,6 +865,18 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
 .tcn-w { font-size: 12px; opacity: 0.9; }
 @media (min-width: 900px) { .tile.tile-cal { min-height: 0; padding: 16px 20px; } }
 
+/* Pdf plus */
+:root { --t-pdf: #e11d48; }
+[data-theme="vivace"] { --t-pdf: #ef4444; }
+[data-theme="notte"] { --t-pdf: #be123c; }
+[data-theme="carta"] { --t-pdf: #9a4a3c; }
+[data-theme="tramonto"] { --t-pdf: #db2777; }
+[data-theme="oceano"] { --t-pdf: #4f46e5; }
+[data-theme="pastello"] { --t-pdf: #ffb3b3; }
+[data-theme="pop"] { --t-pdf: #ff8a3d; }
+[data-theme="oro"] { --t-pdf: #1f1c16; }
+.tp-ico svg { width: 30px; height: 30px; }
+
 /* mese */
 .cal { display: grid; gap: 16px; }
 .cal-box { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 12px 12px; }
