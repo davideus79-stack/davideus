@@ -276,6 +276,21 @@
     </form>
   </dialog>
 
+  <!-- Salva un file in una cartella dell'iPhone (app File) -->
+  <dialog id="save-dlg" class="fid-dlg">
+    <div class="fid-card">
+      <h2>Salva sull'iPhone</h2>
+      <p id="save-name" class="save-name"></p>
+      <ol class="save-steps">
+        <li>Tocca <b>Scegli la cartella</b></li>
+        <li>Nel menu che si apre tocca <b>Salva su File</b></li>
+        <li>Scegli la cartella che vuoi e tocca <b>Salva</b></li>
+      </ol>
+      <button id="save-go" class="btn primary big" type="button" disabled><span class="spinner"></span>Preparo il file…</button>
+      <button id="save-cancel" class="link" type="button">Annulla</button>
+    </div>
+  </dialog>
+
   <!-- Tasto Condividi dell'iPhone -->
   <dialog id="sh-dlg" class="fid-dlg sh-dlg">
     <div class="fid-card sh-card">

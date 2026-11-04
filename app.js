@@ -644,7 +644,7 @@
     name = `<button class="row-name" data-act="${canView ? "view" : CAN_SHARE_FILES ? "share" : "download"}">${esc(item.file_name)}</button>`;
     actions = `${starBtn(item, "ra")}${canView ? `<button class="ra" data-act="view" title="Apri" aria-label="Apri">${ICONS.open}</button>` : ""}
       ${CAN_SHARE_FILES
-        ? `<button class="ra" data-act="share" title="Salva" aria-label="Salva">${ICONS.share}</button>`
+        ? `<button class="ra" data-act="share" title="Salva sull'iPhone" aria-label="Salva sull'iPhone">${ICONS.share}</button>`
         : `<button class="ra" data-act="download" title="Scarica" aria-label="Scarica">${ICONS.down}</button>`}
       <button class="ra" data-act="move" title="Sposta" aria-label="Sposta in una cartella">${ICONS.folder}</button>
       <button class="ra del" data-act="delete" title="Cancella" aria-label="Cancella">${ICONS.del}</button>`;
@@ -698,7 +698,7 @@
         ${starBtn(item, "act icon")}
         ${canView ? `<button class="act" data-act="view">${ICONS.open}Apri</button>` : ""}
         ${CAN_SHARE_FILES
-          ? `<button class="act" data-act="share">${ICONS.share}${state.blobs.has(item.id) ? "Tocca per salvare" : "Salva"}</button>`
+          ? `<button class="act" data-act="share">${ICONS.share}Salva sull'iPhone</button>`
           : `<button class="act" data-act="download">${ICONS.down}Scarica</button>`}
         <button class="act icon" data-act="move" aria-label="Sposta in una cartella" title="Sposta in una cartella">${ICONS.folder}</button>
         <button class="act del" data-act="delete" aria-label="Cancella">${ICONS.del}</button>
@@ -1300,37 +1300,41 @@
     toast(f ? `Spostato in "${f.name}"` : "Tolto dalla cartella");
   }
 
-  // Prepara il file e apre il menu Condividi dell'iPhone, da cui si salva in Foto o in File.
-  async function shareFile(item, btn) {
-    if (btn.classList.contains("ra") || btn.classList.contains("row-name")) {
-      const orig = btn.innerHTML;
-      btn = { set innerHTML(v) { /* nella riga resta solo l'icona */ }, get innerHTML() { return orig; }, _el: btn };
-    }
-    let file = state.blobs.get(item.id);
-    if (!file) {
-      btn.innerHTML = '<span class="spinner"></span>Preparo…';
+  // Salva sull'iPhone: prima scarica il file, poi un tocco su "Scegli la cartella" apre il menu
+  // dell'iPhone, da cui "Salva su File" fa scegliere la cartella.
+  let saveItem = null;
+  async function openSave(item) {
+    saveItem = item;
+    const go = $("save-go");
+    $("save-name").textContent = item.file_name;
+    $("save-dlg").showModal();
+    const ready = () => { go.disabled = false; go.innerHTML = ICONS.folder + "Scegli la cartella"; };
+    if (state.blobs.has(item.id)) return ready();
+    go.disabled = true; go.innerHTML = '<span class="spinner"></span>Preparo il file…';
+    try {
       const res = await fetch(await signedUrl(item.file_path));
       if (!res.ok) throw new Error("download");
       const blob = await res.blob();
-      file = new File([blob], item.file_name, { type: item.mime_type || blob.type || "application/octet-stream" });
-      state.blobs.set(item.id, file);
-    }
-    try {
-      await navigator.share({ files: [file] });
-      btn.innerHTML = ICONS.share + "Salva";
-    } catch (e) {
-      if (e && e.name === "NotAllowedError") {
-        // L'iPhone vuole un secondo tocco dopo aver scaricato il file.
-        btn.innerHTML = ICONS.share + "Tocca per salvare";
-        toast("Pronto! Tocca di nuovo per salvarlo sull'iPhone");
-      } else if (!e || e.name !== "AbortError") {
-        btn.innerHTML = ICONS.share + "Salva";
-        throw e;
-      } else {
-        btn.innerHTML = ICONS.share + "Salva";
-      }
+      state.blobs.set(item.id, new File([blob], item.file_name, { type: item.mime_type || blob.type || "application/octet-stream" }));
+      if (saveItem === item) ready();
+    } catch (err) {
+      $("save-dlg").close();
+      toast("Non riesco a scaricare il file: controlla la connessione");
     }
   }
+  $("save-go").addEventListener("click", async () => {
+    const file = saveItem && state.blobs.get(saveItem.id);
+    if (!file) return;
+    try {
+      await navigator.share({ files: [file] });
+      $("save-dlg").close();
+    } catch (e) {
+      if (!e || e.name !== "AbortError") toast("Non si è aperto il menu: riprova");
+    }
+  });
+  $("save-cancel").addEventListener("click", () => { saveItem = null; $("save-dlg").close(); });
+
+  const shareFile = async (item) => openSave(item);
 
   async function deleteItems(items) {
     const paths = items.filter((i) => i.file_path).map((i) => i.file_path);

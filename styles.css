@@ -957,3 +957,11 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
 .v-close { width: 50px; height: 50px; flex-shrink: 0; border-radius: 50%; }
 .v-wide { flex: 1; max-width: 220px; height: 54px; }
 .v-btn.hidden { display: none; }
+
+/* Salva sull'iPhone */
+.save-name { font-weight: 700; word-break: break-word; margin: 0; }
+.save-steps { text-align: left; margin: 0; padding-left: 22px; display: grid; gap: 6px; color: var(--muted); line-height: 1.4; }
+.save-steps b { color: var(--text); }
+#save-go { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+#save-go svg { width: 20px; height: 20px; }
+#save-go .spinner { width: 18px; height: 18px; margin: 0; }
