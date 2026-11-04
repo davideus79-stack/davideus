@@ -17,10 +17,38 @@ function insertAtParaStart(p, node) {
 // A copy of the document where every top-level paragraph starts with a
 // bookmark "_pp_<n>". docx-preview renders bookmarks as <span id>, which lets
 // us know on which rendered page each paragraph starts.
+//
+// Pictures placed "relative to the page" (e.g. a signature saved by Pdf plus)
+// are drawn by docx-preview relative to their paragraph, so they end up in the
+// wrong place. We mark them with a bookmark "_pa_<n>" and move them to the
+// right spot on the page after rendering (see placePageAnchors).
 async function taggedCopy(bytes) {
   const zip = await JSZip.loadAsync(bytes);
   const main = await mainPartPath(zip);
   const xml = parseXml(await zip.file(main).async('string'));
+  const anchors = [];
+  Array.from(xml.getElementsByTagNameNS(NS.wp, 'anchor')).forEach((a) => {
+    const pos = (tag) => {
+      const el = Array.from(a.children).find((c) => c.localName === tag);
+      if (!el || el.getAttribute('relativeFrom') !== 'page') return null;
+      const off = Array.from(el.children).find((c) => c.localName === 'posOffset');
+      return off ? Number(off.textContent) : null;
+    };
+    const x = pos('positionH'), y = pos('positionV');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    let run = a;
+    while (run && !(run.namespaceURI === NS.w && run.localName === 'r')) run = run.parentNode;
+    if (!run || !run.parentNode) return;
+    const i = anchors.length;
+    const s = xml.createElementNS(NS.w, 'w:bookmarkStart');
+    s.setAttributeNS(NS.w, 'w:id', String(900000 + i));
+    s.setAttributeNS(NS.w, 'w:name', `_pa_${i}`);
+    const e = xml.createElementNS(NS.w, 'w:bookmarkEnd');
+    e.setAttributeNS(NS.w, 'w:id', String(900000 + i));
+    run.parentNode.insertBefore(s, run);
+    run.parentNode.insertBefore(e, run);
+    anchors.push({ x: x / EMU_PER_PX, y: y / EMU_PER_PX });
+  });
   bodyParagraphs(xml).forEach((p, i) => {
     const s = xml.createElementNS(NS.w, 'w:bookmarkStart');
     s.setAttributeNS(NS.w, 'w:id', String(800000 + i));
@@ -31,7 +59,30 @@ async function taggedCopy(bytes) {
     insertAtParaStart(p, s);
   });
   zip.file(main, serializeXml(xml));
-  return zip.generateAsync({ type: 'blob' });
+  return { blob: await zip.generateAsync({ type: 'blob' }), anchors };
+}
+
+function placePageAnchors(host, anchors) {
+  anchors.forEach((pos, i) => {
+    const mark = host.querySelector(`[id="_pa_${i}"]`);
+    const sec = mark && mark.closest('section.docx');
+    if (!sec) return;
+    // the picture is the first positioned box with an image after the bookmark
+    const walker = document.createTreeWalker(sec, NodeFilter.SHOW_ELEMENT);
+    walker.currentNode = mark;
+    let box = null;
+    while (walker.nextNode()) {
+      const n = walker.currentNode;
+      if (n.tagName === 'IMG') { box = n.parentElement; break; }
+    }
+    if (!box || box === sec) return;
+    box.style.position = 'absolute';
+    box.style.left = pos.x + 'px';
+    box.style.top = pos.y + 'px';
+    box.style.zIndex = '2';
+    box.style.margin = '0';
+    sec.appendChild(box);
+  });
 }
 
 // The page grows with its real content (the section is a flex column), so
@@ -82,8 +133,8 @@ export async function loadDocx(bytes, name) {
   sandbox.appendChild(host);
   document.body.appendChild(styleHost);
 
-  let blob;
-  try { blob = await taggedCopy(bytes); } catch { blob = new Blob([bytes]); }
+  let blob, anchors = [];
+  try { ({ blob, anchors } = await taggedCopy(bytes)); } catch { blob = new Blob([bytes]); }
   await docx.renderAsync(blob, host, styleHost, {
     className: 'docx',
     inWrapper: false,
@@ -101,6 +152,7 @@ export async function loadDocx(bytes, name) {
 
   const sections = Array.from(host.querySelectorAll('section.docx'));
   if (!sections.length) throw new Error('Documento Word vuoto o non leggibile');
+  try { placePageAnchors(host, anchors); } catch (e) { console.warn('anchors', e); }
   // Images and fonts load after renderAsync resolves and make the content
   // taller: measure only once they are ready, or the page bottom gets cut.
   await settleLayout(host);
