@@ -146,6 +146,8 @@ h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
 
 /* docx pages: neutralise docx-preview page chrome, we provide our own */
 .page section.docx { margin: 0 !important; box-shadow: none !important; background: #fff; }
+/* Word's defaults, not the app's: 10 pt Times New Roman, the font's own line height */
+section.docx { font-family: "Times New Roman", "Liberation Serif", Tinos, serif; font-size: 10pt; font-weight: 400; line-height: normal; letter-spacing: normal; color: #000; text-align: left; }
 
 /* xlsx grid */
 .xgrid { display: grid; background: #fff; font: 13px/1.25 "Inter", Calibri, Arial, sans-serif; color: #111; }

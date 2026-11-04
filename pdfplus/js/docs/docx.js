@@ -49,7 +49,19 @@ async function taggedCopy(bytes) {
     run.parentNode.insertBefore(e, run);
     anchors.push({ x: x / EMU_PER_PX, y: y / EMU_PER_PX });
   });
+  const marks = [];
   bodyParagraphs(xml).forEach((p, i) => {
+    // size and font of the paragraph mark: they set the height of an empty line
+    const pPr = Array.from(p.children).find((c) => c.localName === 'pPr');
+    const rPr = pPr && Array.from(pPr.children).find((c) => c.localName === 'rPr');
+    if (rPr) {
+      const sz = Array.from(rPr.children).find((c) => c.localName === 'sz');
+      const rf = Array.from(rPr.children).find((c) => c.localName === 'rFonts');
+      marks[i] = {
+        pt: sz ? Number(sz.getAttributeNS(NS.w, 'val')) / 2 : null,
+        font: rf ? rf.getAttributeNS(NS.w, 'ascii') || null : null,
+      };
+    }
     const s = xml.createElementNS(NS.w, 'w:bookmarkStart');
     s.setAttributeNS(NS.w, 'w:id', String(800000 + i));
     s.setAttributeNS(NS.w, 'w:name', `_pp_${i}`);
@@ -59,7 +71,7 @@ async function taggedCopy(bytes) {
     insertAtParaStart(p, s);
   });
   zip.file(main, serializeXml(xml));
-  return { blob: await zip.generateAsync({ type: 'blob' }), anchors };
+  return { blob: await zip.generateAsync({ type: 'blob' }), anchors, marks };
 }
 
 function placePageAnchors(host, anchors) {
@@ -107,6 +119,51 @@ async function settleLayout(root) {
   await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 100); });
 }
 
+// Word's "single" line spacing is the font's own line height (e.g. 1.15 for
+// Times New Roman), with fractions. Browsers round each line to whole pixels,
+// so on a long page the text drifts down by 20-30 px and things placed on the
+// preview end up in the wrong spot in Word. Giving each paragraph the exact
+// line height of its font keeps the text where Word puts it.
+const LINE_RATIO = {
+  'times new roman': 1.15, 'liberation serif': 1.15, 'tinos': 1.15, 'times': 1.15,
+  'arial': 1.149, 'liberation sans': 1.149, 'arimo': 1.149, 'helvetica': 1.149,
+  'calibri': 1.2207, 'carlito': 1.2207, 'cambria': 1.1719, 'caladea': 1.1719,
+  'courier new': 1.1328, 'liberation mono': 1.1328, 'cousine': 1.1328,
+  'verdana': 1.2153, 'tahoma': 1.2071, 'georgia': 1.1362, 'garamond': 1.1235,
+  'book antiqua': 1.1704, 'palatino linotype': 1.1704, 'century gothic': 1.2251,
+  'trebuchet ms': 1.1641, 'segoe ui': 1.3301, 'aptos': 1.2,
+};
+const ratioOf = (el) => LINE_RATIO[getComputedStyle(el).fontFamily.split(',')[0].replace(/["']/g, '').trim().toLowerCase()];
+function fixLineHeights(sec, marks = []) {
+  sec.querySelectorAll('p').forEach((p) => {
+    const cs = getComputedStyle(p);
+    const empty = !p.textContent.trim() && !p.querySelector('img, svg, table');
+    if (empty) {
+      // an empty paragraph is still one full line in Word, as tall as its
+      // paragraph mark (style font, or the size set on the mark itself)
+      const probe = document.createElement('span');
+      probe.textContent = 'x';
+      p.appendChild(probe);
+      const ps = getComputedStyle(probe);
+      let size = parseFloat(ps.fontSize);
+      let r = ratioOf(probe) || 1.15;
+      probe.remove();
+      const tag = p.querySelector('span[id^="_pp_"]');
+      const m = tag && marks[+tag.id.slice(4)];
+      if (m && m.pt) size = m.pt * 96 / 72;
+      if (m && m.font && LINE_RATIO[m.font.toLowerCase()]) r = LINE_RATIO[m.font.toLowerCase()];
+      p.style.minHeight = (r * size) + 'px';
+      return;
+    }
+    if (cs.lineHeight !== 'normal') return;
+    const span = Array.from(p.querySelectorAll('span')).find((x) => x.textContent.trim()) || p;
+    const r = ratioOf(span);
+    if (!r) return;
+    p.style.lineHeight = String(r);
+    p.querySelectorAll('span').forEach((x) => { if (getComputedStyle(x).lineHeight === 'normal') x.style.lineHeight = String(r); });
+  });
+}
+
 // Each page keeps the exact paper size of the document (e.g. A4).
 // If the text wraps a little differently here than in Word (iPhone) and the
 // page would come out a bit longer, the body is shrunk slightly to fit.
@@ -133,8 +190,8 @@ export async function loadDocx(bytes, name) {
   sandbox.appendChild(host);
   document.body.appendChild(styleHost);
 
-  let blob, anchors = [];
-  try { ({ blob, anchors } = await taggedCopy(bytes)); } catch { blob = new Blob([bytes]); }
+  let blob, anchors = [], marks = [];
+  try { ({ blob, anchors, marks } = await taggedCopy(bytes)); } catch { blob = new Blob([bytes]); }
   await docx.renderAsync(blob, host, styleHost, {
     className: 'docx',
     inWrapper: false,
@@ -156,6 +213,7 @@ export async function loadDocx(bytes, name) {
   // Images and fonts load after renderAsync resolves and make the content
   // taller: measure only once they are ready, or the page bottom gets cut.
   await settleLayout(host);
+  sections.forEach((sec) => fixLineHeights(sec, marks));
   sections.forEach(fitToPaper);
   let lastPara = 0;
   const pages = sections.map((sec, index) => {
