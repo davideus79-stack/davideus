@@ -977,3 +977,8 @@ button.side-label.on, button.side-label:hover { color: var(--soft-text); }
 #save-go { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 #save-go svg { width: 20px; height: 20px; }
 #save-go .spinner { width: 18px; height: 18px; margin: 0; }
+
+/* Numero di versione */
+.app-ver { text-align: center; font-size: 12px; color: var(--muted); margin: 18px 0 6px; opacity: .8; }
+.menu-ver { margin: 6px 0 2px; padding-top: 8px; border-top: 1px solid var(--line); }
+.app-ver.old { color: #e11d48; opacity: 1; font-weight: 600; }

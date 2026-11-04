@@ -221,6 +221,7 @@
     try { history.replaceState({ screen: "home" }, ""); } catch (e) {}
     render();
     $("menu-user").textContent = state.user.email;
+    showVersion();
     const t = state.user.user_metadata && state.user.user_metadata.theme;
     if (t) applyTheme(t);
     updateFaceIdUi();
@@ -1047,6 +1048,20 @@
   }
   setInterval(checkDue, 15000);
   document.addEventListener("visibilitychange", checkDue);
+
+  // Numero di versione: quello che gira su questo dispositivo, e se online ce n'è uno più nuovo
+  async function showVersion() {
+    const num = (t) => { const m = /myhome-v(\d+)/.exec(t || ""); return m ? +m[1] : 0; };
+    let here = 0, online = 0;
+    try { here = Math.max(0, ...(await caches.keys()).map(num)); } catch (e) {}
+    try { online = num(await (await fetch("sw.js", { cache: "no-store" })).text()); } catch (e) {}
+    if (!here) here = online;
+    if (!here) return;
+    const old = online > here;
+    const txt = old ? `Versione ${here} · c'è la ${online}: chiudi e riapri l'app` : `Versione ${here}${online ? " · è l'ultima ✓" : ""}`;
+    for (const id of ["home-ver", "menu-ver"]) { $(id).textContent = txt; $(id).classList.toggle("old", old); }
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && state.user) showVersion(); });
 
   // Finestra promemoria
   let remItem = null;
