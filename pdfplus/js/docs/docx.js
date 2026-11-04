@@ -34,8 +34,12 @@ async function taggedCopy(bytes) {
   return zip.generateAsync({ type: 'blob' });
 }
 
+// The page grows with its real content (the section is a flex column), so
+// offsetHeight is enough. scrollHeight also counts floating boxes that stick
+// out of the page (logos, text boxes in headers): on iPhone/Safari that made
+// some pages much longer than A4, with the footer left halfway down.
 function fullHeight(sec) {
-  return Math.ceil(Math.max(sec.offsetHeight, sec.scrollHeight));
+  return Math.ceil(sec.offsetHeight);
 }
 
 async function settleLayout(root) {
@@ -50,6 +54,24 @@ async function settleLayout(root) {
   ]);
   // rAF is paused in background tabs: never wait on it alone.
   await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); setTimeout(r, 100); });
+}
+
+// Each page keeps the exact paper size of the document (e.g. A4).
+// If the text wraps a little differently here than in Word (iPhone) and the
+// page would come out a bit longer, the body is shrunk slightly to fit.
+// Only when it is much longer (a document without page breaks) the page grows.
+function fitToPaper(sec) {
+  const paper = parseFloat(getComputedStyle(sec).minHeight) || 0;
+  if (!paper) return;
+  const natural = sec.offsetHeight;
+  if (natural > paper + 1) {
+    const art = sec.querySelector(':scope > article');
+    const extra = natural - paper;
+    if (!art || extra > paper * 0.2) return;
+    const ah = art.offsetHeight;
+    art.style.zoom = String(Math.max(0.75, (ah - extra - 2) / ah));
+  }
+  if (sec.offsetHeight <= paper + 1) sec.style.height = paper + 'px';
 }
 
 export async function loadDocx(bytes, name) {
@@ -82,6 +104,7 @@ export async function loadDocx(bytes, name) {
   // Images and fonts load after renderAsync resolves and make the content
   // taller: measure only once they are ready, or the page bottom gets cut.
   await settleLayout(host);
+  sections.forEach(fitToPaper);
   let lastPara = 0;
   const pages = sections.map((sec, index) => {
     const w = sec.offsetWidth;
